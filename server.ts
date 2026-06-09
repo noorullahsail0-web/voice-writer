@@ -13,6 +13,19 @@ import dotenv from "dotenv";
 // Load environment variables
 dotenv.config();
 
+// Polyfill Promise.try for older Node environments lacking native support
+if (typeof (Promise as any).try !== 'function') {
+  (Promise as any).try = function<T>(callback: (...args: any[]) => T | PromiseLike<T>, ...args: any[]): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      try {
+        resolve(callback(...args));
+      } catch (err) {
+        reject(err);
+      }
+    });
+  };
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

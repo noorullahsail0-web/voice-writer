@@ -26,11 +26,9 @@ import {
 
 // Dynamically import pdfjs safely
 import * as pdfjsLib from "pdfjs-dist";
-// @ts-ignore
-import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-// Set worker path using Vite's resolved asset URL to ensure it loads from the same origin gracefully
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// Set worker path cleanly using standard unpkg CDN for stable version 4.4.168
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
 
 interface PdfExtractorProps {
   activeDraft: ComposerDraft;
