@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Noto Naskh Arabic", system-ui, sans-serif;
+  --font-mono: "Fira Code", monospace;
+  --font-nastaleeq: "Noto Nastaliq Urdu", "Noto Naskh Arabic", serif;
+}
+
+/* Custom responsive utility classes */
+.font-nastaleeq {
+  font-family: 'Noto Nastaliq Urdu', 'Noto Naskh Arabic', serif;
+  line-height: 2.3 !important;
+}
+
+.font-arabic {
+  font-family: 'Noto Naskh Arabic', sans-serif;
+  line-height: 1.9 !important;
+}
+
+/* Base styling */
+body {
+  font-family: var(--font-sans);
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+

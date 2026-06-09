@@ -1,0 +1,6 @@
+{
+  "name": "Urdu Voicewriter and PDF Extractor",
+  "description": "Urdu, Arabic, and English voice composer and high-fidelity scanned PDF text converter.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
