@@ -8,12 +8,18 @@ const PRECACHE_ASSETS = [
   '/icon-512.png'
 ];
 
-// On install, precache core layout assets
+// On install, precache core layout assets resiliently
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        return cache.addAll(PRECACHE_ASSETS);
+        // Cache assets one-by-one to prevent a single missing asset from breaking installation
+        const cachePromises = PRECACHE_ASSETS.map((asset) => {
+          return cache.add(asset).catch((err) => {
+            console.warn(`PWA precache skipped for asset ${asset}:`, err);
+          });
+        });
+        return Promise.all(cachePromises);
       })
       .then(() => self.skipWaiting())
   );
