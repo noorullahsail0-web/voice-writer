@@ -41,15 +41,12 @@ const getPdfjsLib = () => {
   if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
       try {
-        // Use Vite's native URL constructor helper, which automatically resolves & bundles
-        // pdf.worker.min.mjs directly onto the same host, avoiding cross-origin (CORS) or version errors.
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.min.mjs",
-          import.meta.url
-        ).toString();
-        console.log("PDF.js local Worker configured via Vite URL.");
+        // Use our same-origin copied static worker file (built during Vite compile)
+        // to bypass any cross-origin (CORS) or bundler URL resolving errors in production / Vercel.
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+        console.log("PDF.js local Worker configured statically from /pdf.worker.min.mjs.");
       } catch (e) {
-        console.warn("Error setting PDF.js worker:", e);
+        console.warn("Error setting local PDF.js worker, falling back to CDN:", e);
         pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
       }
     }
@@ -734,13 +731,14 @@ export default function PdfExtractor({
                     onClick={() => {
                       if (!isProcessing) setCurrentPage(item.pageNumber);
                     }}
+                    title={item.errorMessage ? `خرابی: ${item.errorMessage}` : `صفحہ ${item.pageNumber}`}
                     className={`p-2.5 border rounded-xl text-center cursor-pointer transition flex flex-col items-center justify-center ${
                       item.status === "success"
                         ? "bg-emerald-50 border-emerald-250 text-emerald-800"
                         : item.status === "processing"
                         ? "bg-blue-50 border-blue-250 text-blue-800 animate-pulse"
                         : item.status === "failed"
-                        ? "bg-rose-50 border-rose-250 text-rose-850"
+                        ? "bg-rose-50 border-rose-250 text-rose-850 hover:bg-rose-100"
                         : "bg-slate-50 border-slate-200 text-slate-505"
                     }`}
                   >
@@ -757,6 +755,30 @@ export default function PdfExtractor({
                   </div>
                 ))}
               </div>
+
+              {/* Specific failed pages error logs */}
+              {progressList.some((item) => item.status === "failed") && (
+                <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-2 text-xs text-rose-850">
+                  <div className="font-bold font-nastaleeq flex items-center gap-1.5 text-rose-900">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    ناکام صفحات کی خرابیاں (Page Errors):
+                  </div>
+                  <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1" dir="rtl">
+                    {progressList
+                      .filter((item) => item.status === "failed")
+                      .map((item) => (
+                        <div key={item.pageNumber} className="bg-white/80 p-2.5 rounded-lg border border-rose-100 font-mono text-right text-[11px] leading-relaxed flex flex-col sm:flex-row sm:items-center justify-start gap-1.5">
+                          <span className="font-nastaleeq font-bold text-rose-900 shrink-0 bg-rose-100 py-0.5 px-2 rounded-md">
+                            صفحہ {item.pageNumber}:
+                          </span>
+                          <span className="text-slate-750 font-sans font-medium">
+                            {item.errorMessage || "نامعلوم خرابی پیش آئی۔"}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
