@@ -39,7 +39,12 @@ app.use(express.urlencoded({ limit: "100mb", extended: true }));
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+  if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.trim() === "") {
+    if (process.env.VERCEL) {
+      throw new Error(
+        "ورسل پر جیمنی کی (GEMINI_API_KEY) غائب ہے۔ براہ کرم اپنے Vercel Dashboard میں جا کر Project Settings -> Environment Variables میں GEMINI_API_KEY کو اپنے جیمنی کی کے ساتھ سیٹ کریں اور دوبارہ ڈپلائے کریں۔"
+      );
+    }
     throw new Error(
       "حسبِ منشا کام کرنے کے لئے GEMINI_API_KEY فراہم کی جانی چاہیے۔ براہ کرم AI Studio کے دائیں کونے میں موجود 'Secrets' مینو میں جا کر اپنی کی فراہم کریں۔"
     );

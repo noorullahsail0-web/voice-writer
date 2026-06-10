@@ -331,11 +331,12 @@ export default function PdfExtractor({
       if (!isSuccess && ocrMode === "ai_ocr") {
         try {
           console.log(`Page ${pageNum} AI OCR failed. Attempting digital text fallback extraction...`);
+          const originalOcrError = lastErrMessage;
           updatePageProgress(
             pageNum,
             "processing",
             undefined,
-            "جیمنی او سی آر لوڈ ہائی ہونے کی وجہ سے ہم براہِ راست ڈیجیٹل ٹیکسٹ نکالنے کی کوشش کر رہے ہیں..."
+            "جیمنی او سی آر فیل ہونے کی وجہ سے ہم براہِ راست ڈیجیٹل ٹیکسٹ نکالنے کی کوشش کر رہے ہیں..."
           );
           
           const page = await pdfDocument.getPage(pageNum);
@@ -348,11 +349,12 @@ export default function PdfExtractor({
             isSuccess = true;
             console.log(`Page ${pageNum} digital text fallback succeeded!`);
           } else {
-            lastErrMessage = "یہ اسکین شدہ (تصویر والا) صفحہ معلوم ہوتا ہے جس سے براہِ راست متن نکالنا ممکن نہیں ہے، اور جیمنی سرور پر فی الحال بوجھ زیادہ ہے۔";
+            // Keep the original OCR error, but append info about scanned page fallback failure!
+            lastErrMessage = `سرور جواب: ${originalOcrError}۔ (مزید معلومات: یہ اسکین شدہ تصویر یا نان-ڈیجیٹل صفحہ معلوم ہوتا ہے جس میں سے براہِ راست متن نکالنا ممکن نہیں ہے)۔`;
           }
         } catch (fallbackErr: any) {
           console.error(`Page ${pageNum} digital fallback failed:`, fallbackErr);
-          lastErrMessage = `او سی آر ناکام ہوا اور ڈیجیٹل ٹیکسٹ نکالنے میں بھی خرابی آئی: ${fallbackErr.message || fallbackErr}`;
+          lastErrMessage = `او سی آر ناکام ہوا (${lastErrMessage}) اور ڈیجیٹل ٹیکسٹ نکالنے میں بھی خرابی آئی: ${fallbackErr.message || fallbackErr}`;
         }
       }
 
