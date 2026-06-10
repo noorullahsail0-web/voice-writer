@@ -25,19 +25,37 @@ import {
 } from "lucide-react";
 
 // Dynamically import pdfjs safely
-import * as pdfjsLibFallback from "pdfjs-dist";
+import * as pdfjsLib from "pdfjs-dist";
 
-// Safely resolve pdfjsLib from global window CDN or fallback to node package
-const pdfjsLib = (typeof window !== "undefined" && (window as any).pdfjsLib)
-  ? (window as any).pdfjsLib
-  : pdfjsLibFallback;
+// Convert Urdu, Arabic, and Persian numerals (e.g. ۱, ۲, ۳) to standard English ASCII digits (1, 2, 3)
+const convertUrduToEnglishDigits = (input: string): string => {
+  const map: Record<string, string> = {
+    "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4", "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9",
+    "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4", "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9"
+  };
+  return input.replace(/[۰-۹٠-٩]/g, (char) => map[char] || char);
+};
 
-if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 
-    (typeof window !== "undefined" && (window as any).pdfjsLib)
-      ? "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"
-      : "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
-}
+// Safely configure and retrieve the PDF.js library instance matching version 4.4.168
+const getPdfjsLib = () => {
+  if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      try {
+        // Use Vite's native URL constructor helper, which automatically resolves & bundles
+        // pdf.worker.min.mjs directly onto the same host, avoiding cross-origin (CORS) or version errors.
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+          "pdfjs-dist/build/pdf.worker.min.mjs",
+          import.meta.url
+        ).toString();
+        console.log("PDF.js local Worker configured via Vite URL.");
+      } catch (e) {
+        console.warn("Error setting PDF.js worker:", e);
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
+      }
+    }
+  }
+  return pdfjsLib;
+};
 
 interface PdfExtractorProps {
   activeDraft: ComposerDraft;
@@ -109,7 +127,8 @@ export default function PdfExtractor({
       fileReader.onload = async () => {
         try {
           const typedArray = new Uint8Array(fileReader.result as ArrayBuffer);
-          const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
+          const pdfjs = getPdfjsLib();
+          const pdf = await pdfjs.getDocument({ data: typedArray }).promise;
           setPdfDocument(pdf);
           setTotalPages(pdf.numPages);
           setStartPageRange("");
@@ -580,28 +599,32 @@ export default function PdfExtractor({
                   <div className="flex items-center gap-1 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
                     <span className="text-[10px] text-slate-400 font-nastaleeq">تک:</span>
                     <input
-                      type="number"
-                      min={typeof startPageRange === "number" ? startPageRange : 1}
-                      max={totalPages}
+                      type="text"
+                      inputMode="numeric"
                       value={endPageRange}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setEndPageRange(val === "" ? "" : Math.min(totalPages, Math.max(1, parseInt(val) || 1)));
+                        const converted = convertUrduToEnglishDigits(val);
+                        const clean = converted.replace(/[^0-9]/g, "");
+                        setEndPageRange(clean === "" ? "" : Math.min(totalPages > 0 ? totalPages : 9999, Math.max(1, parseInt(clean) || 1)));
                       }}
+                      placeholder={totalPages > 0 ? totalPages.toString() : ""}
                       className="w-12 text-center bg-transparent text-xs font-mono font-bold border-none outline-none"
                     />
                   </div>
                   <div className="flex items-center gap-1 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
                     <span className="text-[10px] text-slate-400 font-nastaleeq">صفحہ نمبر:</span>
                     <input
-                      type="number"
-                      min={1}
-                      max={totalPages}
+                      type="text"
+                      inputMode="numeric"
                       value={startPageRange}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setStartPageRange(val === "" ? "" : Math.min(totalPages, Math.max(1, parseInt(val) || 1)));
+                        const converted = convertUrduToEnglishDigits(val);
+                        const clean = converted.replace(/[^0-9]/g, "");
+                        setStartPageRange(clean === "" ? "" : Math.min(totalPages > 0 ? totalPages : 9999, Math.max(1, parseInt(clean) || 1)));
                       }}
+                      placeholder="1"
                       className="w-12 text-center bg-transparent text-xs font-mono font-bold border-none outline-none"
                     />
                   </div>
