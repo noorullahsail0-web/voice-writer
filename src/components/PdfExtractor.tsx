@@ -439,7 +439,7 @@ export default function PdfExtractor({
         <div
           onDragOver={onDragOver}
           onDrop={onDrop}
-          className="bg-white p-12 border-2 border-dashed border-slate-300 rounded-3xl hover:border-blue-500 hover:bg-slate-50/50 transition duration-200 cursor-pointer flex flex-col items-center justify-center text-center space-y-4"
+          className="bg-white p-12 border-2 border-dashed border-slate-200 rounded-3xl hover:border-indigo-400 hover:bg-indigo-50/10 transition duration-200 cursor-pointer flex flex-col items-center justify-center text-center space-y-4"
         >
           <input
             type="file"
@@ -449,7 +449,7 @@ export default function PdfExtractor({
             onChange={handleFileChange}
           />
           <label htmlFor="pdf-file-selector" className="cursor-pointer space-y-4 block">
-            <div className="bg-blue-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto text-blue-500 shadow-inner group-hover:scale-105 transition">
+            <div className="bg-indigo-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto text-indigo-650 shadow-inner group-hover:scale-105 transition">
               <UploadCloud className="w-10 h-10" />
             </div>
             <div className="space-y-2">
@@ -499,8 +499,8 @@ export default function PdfExtractor({
                 <button
                   type="button"
                   onClick={() => setOcrMode("ai_ocr")}
-                  className={`py-2 rounded-lg text-xs font-nastaleeq font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                    ocrMode === "ai_ocr" ? "bg-indigo-600 text-white shadow-sm" : "bg-slate-50 text-slate-650 hover:bg-slate-100"
+                  className={`py-2.5 rounded-xl text-xs font-nastaleeq font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    ocrMode === "ai_ocr" ? "bg-gradient-to-tr from-indigo-700 to-indigo-850 text-white shadow-md shadow-indigo-100/40" : "bg-slate-50 text-slate-650 hover:bg-slate-100"
                   }`}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
@@ -509,15 +509,15 @@ export default function PdfExtractor({
                 <button
                   type="button"
                   onClick={() => setOcrMode("direct_text")}
-                  className={`py-2 rounded-lg text-xs font-nastaleeq font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                    ocrMode === "direct_text" ? "bg-indigo-600 text-white shadow-sm" : "bg-slate-50 text-slate-650 hover:bg-slate-100"
+                  className={`py-2.5 rounded-xl text-xs font-nastaleeq font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    ocrMode === "direct_text" ? "bg-gradient-to-tr from-indigo-700 to-indigo-850 text-white shadow-md shadow-indigo-100/40" : "bg-slate-50 text-slate-650 hover:bg-slate-100"
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" />
                   براہِ راست ٹیکسٹ ریڈر
                 </button>
               </div>
-              <p className="text-[9px] text-slate-400 font-nastaleeq leading-tight uppercase">
+              <p className="text-[9px] text-teal-800 font-medium bg-teal-50 px-2.5 py-0.5 rounded-md font-nastaleeq leading-tight mt-1 inline-block">
                 *جیمنی موڈ خراب پرنٹس اور اسکین شدہ اوراق کے لیے بہترین ہے۔
               </p>
             </div>
@@ -529,8 +529,8 @@ export default function PdfExtractor({
                 <button
                   type="button"
                   onClick={() => setRangeMode("current")}
-                  className={`py-2 rounded-lg text-xs font-bold font-nastaleeq transition cursor-pointer ${
-                    rangeMode === "current" ? "bg-blue-600 text-white shadow-sm" : "bg-slate-50 text-slate-650 hover:bg-slate-100"
+                  className={`py-2.5 rounded-xl text-xs font-bold font-nastaleeq transition cursor-pointer ${
+                    rangeMode === "current" ? "bg-gradient-to-tr from-teal-700 to-teal-850 text-white shadow-md shadow-teal-100/40" : "bg-slate-50 text-slate-650 hover:bg-slate-100"
                   }`}
                 >
                   صرف یہ صفحہ
@@ -538,8 +538,8 @@ export default function PdfExtractor({
                 <button
                   type="button"
                   onClick={() => setRangeMode("range")}
-                  className={`py-2 rounded-lg text-xs font-bold font-nastaleeq transition cursor-pointer ${
-                    rangeMode === "range" ? "bg-blue-600 text-white shadow-sm" : "bg-slate-50 text-slate-650 hover:bg-slate-100"
+                  className={`py-2.5 rounded-xl text-xs font-bold font-nastaleeq transition cursor-pointer ${
+                    rangeMode === "range" ? "bg-gradient-to-tr from-teal-700 to-teal-850 text-white shadow-md shadow-teal-100/40" : "bg-slate-50 text-slate-650 hover:bg-slate-100"
                   }`}
                 >
                   خاص صفحات
@@ -547,8 +547,8 @@ export default function PdfExtractor({
                 <button
                   type="button"
                   onClick={() => setRangeMode("all")}
-                  className={`py-2 rounded-lg text-xs font-bold font-nastaleeq transition cursor-pointer ${
-                    rangeMode === "all" ? "bg-blue-600 text-white shadow-sm" : "bg-slate-50 text-slate-650 hover:bg-slate-100"
+                  className={`py-2.5 rounded-xl text-xs font-bold font-nastaleeq transition cursor-pointer ${
+                    rangeMode === "all" ? "bg-gradient-to-tr from-teal-700 to-teal-850 text-white shadow-md shadow-teal-100/40" : "bg-slate-50 text-slate-650 hover:bg-slate-100"
                   }`}
                 >
                   پورے صفحات
@@ -589,7 +589,7 @@ export default function PdfExtractor({
               {!isProcessing ? (
                 <button
                   onClick={startExtraction}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-nastaleeq font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition cursor-pointer"
+                  className="w-full py-3.5 bg-gradient-to-tr from-teal-700 to-teal-850 hover:from-teal-800 hover:to-teal-900 text-white font-nastaleeq font-bold text-sm rounded-xl shadow-lg shadow-teal-100/50 flex items-center justify-center gap-2 transition cursor-pointer"
                 >
                   <Play className="w-4 h-4 shrink-0" />
                   ٹیکسٹ میں تبدیل کرنا شروع کریں
@@ -597,7 +597,7 @@ export default function PdfExtractor({
               ) : (
                 <button
                   onClick={abortExtraction}
-                  className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-nastaleeq font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition cursor-pointer"
+                  className="w-full py-3.5 bg-gradient-to-tr from-rose-600 to-rose-750 hover:from-rose-700 hover:to-rose-800 text-white font-nastaleeq font-bold text-sm rounded-xl shadow-lg shadow-rose-100/50 flex items-center justify-center gap-2 transition cursor-pointer"
                 >
                   <Pause className="w-4 h-4 shrink-0" />
                   پروسیسنگ روک دیں (Pause)

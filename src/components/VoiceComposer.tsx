@@ -359,12 +359,12 @@ export default function VoiceComposer({
   return (
     <div className="space-y-6 text-right" dir="rtl">
       {/* Title block */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-250/70 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="w-full md:w-3/4 space-y-1.5 text-right">
           <label className="text-xs text-slate-400 font-bold block">مسودے کا عنوان (نام)</label>
           <input
             type="text"
-            className="w-full text-lg font-bold font-nastaleeq bg-transparent border-b border-dashed border-slate-200 focus:border-blue-500 focus:outline-none pb-1 transition"
+            className="w-full text-lg font-bold font-nastaleeq bg-transparent border-b border-dashed border-slate-200 focus:border-teal-600 focus:outline-none pb-1 transition"
             placeholder="مسودے کا عنوان یہاں لکھیں..."
             value={activeDraft.title}
             onChange={(e) => onUpdateDraftTitle(e.target.value)}
@@ -372,11 +372,11 @@ export default function VoiceComposer({
         </div>
 
         {/* Selected script display info */}
-        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3.5 py-1.5 rounded-xl self-end md:self-center">
-          <Languages className="w-4 h-4 text-blue-500" />
-          <span className="text-xs text-slate-500 font-bold">
+        <div className="flex items-center gap-1.5 bg-teal-50 border border-teal-100 px-3.5 py-1.5 rounded-xl self-end md:self-center">
+          <Languages className="w-4 h-4 text-teal-600" />
+          <span className="text-xs text-slate-600 font-bold">
             رسم الخط:{" "}
-            <strong className="text-blue-600">
+            <strong className="text-teal-700">
               {language === "ur" ? "اردو نستعلیق" : language === "ar" ? "عربی نسخ" : "انگریزی رومن"}
             </strong>
           </span>
@@ -390,9 +390,9 @@ export default function VoiceComposer({
         <div className="lg:col-span-4 space-y-5">
           
           {/* Language Selection card */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm space-y-4">
-            <h4 className="text-sm font-bold font-nastaleeq text-slate-800 border-b pb-2 flex items-center justify-start gap-2">
-              <Languages className="w-4 h-4 text-blue-500" />
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+            <h4 className="text-sm font-bold font-nastaleeq text-slate-800 border-b border-slate-150 pb-2 flex items-center justify-start gap-2">
+              <Languages className="w-4 h-4 text-teal-600" />
               1۔ زبان منتخب کریں:
             </h4>
             <div className="grid grid-cols-3 gap-2">
@@ -400,7 +400,7 @@ export default function VoiceComposer({
                 onClick={() => handleLanguageChange("ur")}
                 className={`py-3 rounded-xl font-nastaleeq text-xs font-bold transition cursor-pointer flex flex-col items-center gap-1.5 ${
                   language === "ur"
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-100"
+                    ? "bg-gradient-to-tr from-teal-700 to-teal-850 text-white shadow-md shadow-teal-100/40"
                     : "bg-slate-50 text-slate-650 hover:bg-slate-100"
                 }`}
               >
@@ -412,7 +412,7 @@ export default function VoiceComposer({
                 onClick={() => handleLanguageChange("ar")}
                 className={`py-3 rounded-xl font-nastaleeq text-xs font-bold transition cursor-pointer flex flex-col items-center gap-1.5 ${
                   language === "ar"
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-100"
+                    ? "bg-gradient-to-tr from-teal-700 to-teal-850 text-white shadow-md shadow-teal-100/40"
                     : "bg-slate-50 text-slate-650 hover:bg-slate-100"
                 }`}
               >
@@ -424,7 +424,7 @@ export default function VoiceComposer({
                 onClick={() => handleLanguageChange("en")}
                 className={`py-3 rounded-xl font-sans text-xs font-bold transition cursor-pointer flex flex-col items-center gap-1.5 ${
                   language === "en"
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-100"
+                    ? "bg-gradient-to-tr from-teal-700 to-teal-850 text-white shadow-md shadow-teal-100/40"
                     : "bg-slate-50 text-slate-650 hover:bg-slate-100"
                 }`}
               >
@@ -520,18 +520,18 @@ export default function VoiceComposer({
         <div className="lg:col-span-8 flex flex-col space-y-4">
           
           {/* Main Composed Text Area container */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col h-[480px] relative">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden flex flex-col h-[480px] relative">
             
             {/* Header Area Status line */}
-            <div className="bg-slate-50/80 border-b border-slate-150 p-3.5 flex items-center justify-between gap-4">
+            <div className="bg-slate-50/85 border-b border-slate-100 p-3.5 flex items-center justify-between gap-4">
               <div className="flex items-center gap-1.5">
                 {(isWebSpeechListening || isGeminiRecording) && (
-                  <span className="flex h-2.5 w-2.5 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                  <span className="flex h-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
                   </span>
                 )}
-                <span className="text-xs text-slate-500 font-nastaleeq font-bold">
+                <span className="text-xs text-slate-600 font-nastaleeq font-bold">
                   {isWebSpeechListening
                     ? "مائیک آن ہے، بولنا جاری رکھیں..."
                     : isGeminiRecording
@@ -541,22 +541,22 @@ export default function VoiceComposer({
                     : "محفوظ مسودہ تحریر ونڈو"}
                 </span>
               </div>
-              <div className="text-[10px] text-slate-400 font-mono">
+              <div className="text-[10px] text-teal-850 font-bold bg-teal-50 px-2.5 py-0.5 rounded-md">
                 {activeDraft.content.length} حروف
               </div>
             </div>
 
             {/* Realtime Listening Pulse overlay */}
             {(isWebSpeechListening || isProcessing) && (
-              <div className="absolute top-12 left-0 right-0 bg-blue-50/85 text-blue-700 border-b border-blue-150 px-4 py-1.5 text-xs font-bold flex items-center justify-center gap-2 z-10 font-nastaleeq text-center leading-relaxed">
+              <div className="absolute top-12 left-0 right-0 bg-[#f0fcf9]/95 text-teal-800 border-b border-teal-100 px-4 py-2 text-xs font-bold flex items-center justify-center gap-2 z-10 font-nastaleeq text-center leading-relaxed">
                 {isWebSpeechListening ? (
                   <>
-                    <span className="inline-block w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></span>
+                    <span className="inline-block w-1.5 h-1.5 bg-teal-600 rounded-full animate-bounce"></span>
                     مائیکروفون فعال ہے۔ بولیں، ہم ٹائپ کر رہے ہیں... 🎙️
                   </>
                 ) : (
                   <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600 shrink-0" />
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-600 shrink-0" />
                     اعلیٰ درجے جیمنی آرٹیفیشل انٹیلیجنس تحریر ترتیب دے رہی ہے...
                   </>
                 )}
@@ -573,7 +573,7 @@ export default function VoiceComposer({
                 }`}
                 placeholder={
                   language === "ur"
-                    ? "مسودہ یہاں طاہر ہوگا۔ آپ بول کر یا براہِ راست کی بورڈ سے ٹائپ کر کے اضافہ کر سکتے ہیں..."
+                    ? "مسودہ یہاں ظاہر ہوگا۔ آپ بول کر یا براہِ راست کی بورڈ سے ٹائپ کر کے اضافہ کر سکتے ہیں..."
                     : language === "ar"
                     ? "سيتم استخراج النص العربي هنا تلقائياً، يمكنك التعديل المباشر..."
                     : "Spoken or transcribed English text will appear here. Edit directly..."
@@ -584,7 +584,7 @@ export default function VoiceComposer({
 
               {/* Interim Speech Output Overlay */}
               {interimTranscript && (
-                <div className="p-3 bg-indigo-50/90 text-indigo-700 rounded-xl mt-2 text-xs border border-indigo-100 font-nastaleeq leading-relaxed text-right">
+                <div className="p-3 bg-teal-50/90 text-teal-850 rounded-xl mt-2 text-xs border border-teal-100 font-nastaleeq leading-relaxed text-right">
                   <strong>بولے فقرے (فوری لائیو ڈرافٹ):</strong> {interimTranscript}
                 </div>
               )}
@@ -592,9 +592,9 @@ export default function VoiceComposer({
 
             {/* AI Magic Actions Shelf below composer sheets */}
             {activeDraft.content && (
-              <div className="bg-slate-50/80 p-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-1.5">
-                <span className="text-[10px] text-slate-450 font-nastaleeq font-bold flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+              <div className="bg-indigo-50/50 p-3 border-t border-indigo-100/60 flex flex-wrap items-center justify-between gap-1.5">
+                <span className="text-[11px] text-indigo-800 font-nastaleeq font-bold flex items-center gap-1 bg-indigo-50 px-2 py-0.5 rounded-md">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                   جیمنی ایڈیٹر مینو:
                 </span>
                 
@@ -602,25 +602,25 @@ export default function VoiceComposer({
                   <button
                     onClick={() => handleRefineText("imla")}
                     disabled={isProcessing}
-                    className="flex items-center gap-1 text-[10px] bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-650 px-2.5 py-1.5 rounded-lg text-slate-700 font-nastaleeq font-bold transition cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1 text-xs bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-700 px-3 py-1.5 rounded-lg text-slate-700 font-nastaleeq font-bold shadow-sm transition cursor-pointer disabled:opacity-50"
                   >
-                    <Wand2 className="w-3 h-3 text-indigo-500" />
+                    <Wand2 className="w-3.5 h-3.5 text-indigo-650" />
                     املا اصلاح (Spellcheck)
                   </button>
 
                   <button
                     onClick={() => handleRefineText("tashkeel")}
                     disabled={isProcessing}
-                    className="flex items-center gap-1 text-[10px] bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-650 px-2.5 py-1.5 rounded-lg text-slate-700 font-nastaleeq font-bold transition cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1 text-xs bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-700 px-3 py-1.5 rounded-lg text-slate-700 font-nastaleeq font-bold shadow-sm transition cursor-pointer disabled:opacity-50"
                   >
-                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                    <Sparkles className="w-3.5 h-3.5 text-amber-650" />
                     اعراب (زیر زبر پیش) اضافہ
                   </button>
 
                   <button
                     onClick={() => handleRefineText("khulasa")}
                     disabled={isProcessing}
-                    className="flex items-center gap-1 text-[10px] bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-650 px-2.5 py-1.5 rounded-lg text-slate-700 font-nastaleeq font-bold transition cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1 text-xs bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-700 px-3 py-1.5 rounded-lg text-slate-700 font-nastaleeq font-bold shadow-sm transition cursor-pointer disabled:opacity-50"
                   >
                     خلاصہ کریں (Summary)
                   </button>
@@ -628,7 +628,7 @@ export default function VoiceComposer({
                   <button
                     onClick={() => handleRefineText("urdu_translate")}
                     disabled={isProcessing}
-                    className="flex items-center gap-1 text-[10px] bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-650 px-2.5 py-1.5 rounded-lg text-slate-700 font-nastaleeq font-bold transition cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1 text-xs bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-700 px-3 py-1.5 rounded-lg text-slate-700 font-nastaleeq font-bold shadow-sm transition cursor-pointer disabled:opacity-50"
                   >
                     اردو ترجمہ کریں
                   </button>
@@ -636,7 +636,7 @@ export default function VoiceComposer({
                   <button
                     onClick={() => handleRefineText("english_translate")}
                     disabled={isProcessing}
-                    className="flex items-center gap-1 text-[10px] bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-650 px-2.5 py-1.5 rounded-lg text-slate-700 font-nastaleeq font-bold transition cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1 text-xs bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-700 px-3 py-1.5 rounded-lg text-slate-700 font-nastaleeq font-bold shadow-sm transition cursor-pointer disabled:opacity-50"
                   >
                     English Translation
                   </button>

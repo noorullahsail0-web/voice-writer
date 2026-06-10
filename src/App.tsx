@@ -127,20 +127,20 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50/70" dir="rtl">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#f3f6f5] text-slate-900" dir="rtl">
       
       {/* Mobile Top Header */}
-      <header className="lg:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between z-20">
+      <header className="lg:hidden bg-white border-b border-slate-200/80 p-4 flex items-center justify-between z-20">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 hover:bg-slate-100 rounded-lg text-slate-700 transition"
+            className="p-2 hover:bg-slate-50 rounded-lg text-slate-700 transition"
           >
             {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
-          <h1 className="text-sm font-bold font-nastaleeq text-slate-800 leading-none">اردو صوتی وائس رائٹر</h1>
+          <h1 className="text-sm font-bold font-nastaleeq text-teal-850 leading-none">اردو صوتی وائس رائٹر</h1>
         </div>
-        <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 text-white p-2 rounded-lg">
+        <div className="bg-gradient-to-tr from-teal-600 to-indigo-600 text-white p-2 rounded-lg shadow-sm">
           <Sparkles className="w-4 h-4" />
         </div>
       </header>
@@ -149,7 +149,7 @@ export default function App() {
       <div
         className={`${
           isSidebarOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
-        } fixed lg:static inset-y-0 right-0 w-72 z-30 transform transition-transform duration-300 lg:transition-none bg-white border-l border-slate-200 flex-shrink-0 h-full`}
+        } fixed lg:static inset-y-0 right-0 w-72 z-30 transform transition-transform duration-300 lg:transition-none bg-white border-l border-slate-200/80 flex-shrink-0 h-full`}
       >
         <Sidebar
           activeTab={activeTab}
@@ -173,9 +173,9 @@ export default function App() {
       <main className="flex-grow p-4 sm:p-6 lg:p-8 overflow-y-auto space-y-6">
         
         {/* Dynamic header tracker */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200/60 pb-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
           <div className="space-y-1.5 text-right w-full sm:w-auto">
-            <h2 className="text-2xl font-bold font-nastaleeq text-slate-950 tracking-tight leading-relaxed">
+            <h2 className="text-2xl font-bold font-nastaleeq text-slate-900 tracking-tight leading-relaxed">
               {activeTab === ActiveTab.VoiceComposer
                 ? "صوتی گاہ (Voice Composer Sheet)"
                 : activeTab === ActiveTab.PdfExtractor
@@ -194,6 +194,14 @@ export default function App() {
                 : "ایپلی کیشن کے فوائد اور استعمال کا آسان طریقہ"}
             </p>
           </div>
+
+          {/* Interactive Ready to Publish status element - Professional touch */}
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-150 px-3.5 py-1.5 rounded-xl">
+            <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shrink-0"></span>
+            <span className="text-[11px] font-nastaleeq font-bold text-teal-850">
+              سسٹم لائیو ہے • پبلش کے لیے تیار
+            </span>
+          </div>
         </div>
 
         {/* Dynamic landing Dashboard buttons shown in every page if they want a fast switch */}
@@ -201,44 +209,44 @@ export default function App() {
           {/* Dashboard action card 1 - Voice composing */}
           <button
             onClick={() => setActiveTab(ActiveTab.VoiceComposer)}
-            className={`p-6 rounded-2xl border transition duration-200 text-right flex items-center justify-between shadow-sm cursor-pointer group ${
+            className={`p-6 rounded-2xl border transition-all duration-300 text-right flex items-center justify-between shadow-sm cursor-pointer group hover:scale-[1.005] ${
               activeTab === ActiveTab.VoiceComposer
-                ? "bg-blue-600 border-blue-500 text-white"
-                : "bg-white border-slate-200/80 hover:border-slate-350 text-slate-800"
+                ? "bg-gradient-to-tr from-teal-700 via-teal-800 to-emerald-650 border-teal-600 text-white shadow-xl shadow-teal-100/50"
+                : "bg-white border-slate-200 hover:border-teal-400 text-slate-800 hover:shadow-md"
             }`}
           >
             <div className="space-y-1.5 max-w-[80%]">
               <h3 className="text-base font-bold font-nastaleeq leading-relaxed">
                 (1) آواز سے تحریر لکھیں (Voice Composer)
               </h3>
-              <p className={`text-[11px] font-nastaleeq ${activeTab === ActiveTab.VoiceComposer ? "text-blue-105" : "text-slate-450"}`}>
+              <p className={`text-[11px] font-nastaleeq leading-normal ${activeTab === ActiveTab.VoiceComposer ? "text-teal-50" : "text-slate-500"}`}>
                 اردو، عربی اور انگریزی آواز کو سن کر لائیو ٹائپ کرنے کا تیز ترین مائیک ٹول۔
               </p>
             </div>
-            <div className={`p-3.5 rounded-full ${activeTab === ActiveTab.VoiceComposer ? "bg-white/20 text-white" : "bg-blue-50 text-blue-500 group-hover:scale-105 transition"}`}>
-              <Mic className="w-6 h-6" />
+            <div className={`p-3.5 rounded-full ${activeTab === ActiveTab.VoiceComposer ? "bg-white/20 text-white" : "bg-teal-50 text-teal-600 group-hover:scale-105 transition"}`}>
+              <Mic className="w-5 h-5" />
             </div>
           </button>
 
           {/* Dashboard action card 2 - PDF extractor */}
           <button
             onClick={() => setActiveTab(ActiveTab.PdfExtractor)}
-            className={`p-6 rounded-2xl border transition duration-200 text-right flex items-center justify-between shadow-sm cursor-pointer group ${
+            className={`p-6 rounded-2xl border transition-all duration-300 text-right flex items-center justify-between shadow-sm cursor-pointer group hover:scale-[1.005] ${
               activeTab === ActiveTab.PdfExtractor
-                ? "bg-indigo-600 border-indigo-500 text-white"
-                : "bg-white border-slate-200/80 hover:border-slate-350 text-slate-800"
+                ? "bg-gradient-to-tr from-indigo-700 via-indigo-800 to-violet-650 border-indigo-600 text-white shadow-xl shadow-indigo-100/50"
+                : "bg-white border-slate-200 hover:border-indigo-400 text-slate-800 hover:shadow-md"
             }`}
           >
             <div className="space-y-1.5 max-w-[80%]">
               <h3 className="text-base font-bold font-nastaleeq leading-relaxed">
                 (2) پی ڈی ایف سے سادہ ٹیکسٹ نکالیں (PDF Extractor)
               </h3>
-              <p className={`text-[11px] font-nastaleeq ${activeTab === ActiveTab.PdfExtractor ? "text-indigo-105" : "text-slate-450"}`}>
+              <p className={`text-[11px] font-nastaleeq leading-normal ${activeTab === ActiveTab.PdfExtractor ? "text-indigo-50" : "text-slate-500"}`}>
                 واٹر مارک اور بارڈرز کے بغیر خراب کوالٹی کی پی ڈی ایف کو ورڈ ٹیکسٹ میں تبدیل کریں۔
               </p>
             </div>
-            <div className={`p-3.5 rounded-full ${activeTab === ActiveTab.PdfExtractor ? "bg-white/20 text-white" : "bg-indigo-50 text-indigo-500 group-hover:scale-105 transition"}`}>
-              <FileText className="w-6 h-6" />
+            <div className={`p-3.5 rounded-full ${activeTab === ActiveTab.PdfExtractor ? "bg-white/20 text-white" : "bg-indigo-50 text-indigo-650 group-hover:scale-105 transition"}`}>
+              <FileText className="w-5 h-5" />
             </div>
           </button>
         </div>

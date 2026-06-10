@@ -82,13 +82,13 @@ export default function DraftsHistory({
   return (
     <div className="space-y-6 text-right" dir="rtl">
       {/* Search and Action Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-250/70 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
         <div className="relative w-full sm:max-w-md">
           <Search className="absolute right-3.5 top-3 w-5 h-5 text-slate-400" />
           <input
             type="text"
             placeholder="مسودات میں تلاش کریں..."
-            className="w-full pr-11 pl-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+            className="w-full pr-11 pl-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:bg-white transition"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -96,7 +96,7 @@ export default function DraftsHistory({
 
         <button
           onClick={onAddNewDraft}
-          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-nastaleeq px-5 py-2 rounded-xl shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
+          className="w-full sm:w-auto bg-gradient-to-tr from-teal-700 to-teal-850 hover:from-teal-800 hover:to-teal-900 text-white font-nastaleeq px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
         >
           <Plus className="w-5 h-5 shrink-0" />
           نیا مسودہ (نیا پیج)
@@ -127,7 +127,7 @@ export default function DraftsHistory({
               {/* Draft Header */}
               <div className="p-5 border-b border-slate-100 flex items-start justify-between gap-3">
                 <div className="space-y-1">
-                  <h4 className="font-nastaleeq font-bold text-slate-800 line-clamp-1 text-base group-hover:text-blue-600 transition">
+                  <h4 className="font-nastaleeq font-bold text-slate-800 line-clamp-1 text-base group-hover:text-teal-700 transition">
                     {draft.title || "بے نام مسودہ"}
                   </h4>
                   <p className="text-[10px] text-slate-450 flex items-center gap-1 justify-start">
@@ -135,7 +135,7 @@ export default function DraftsHistory({
                     {formatUrduDate(draft.lastModifiedAt)}
                   </p>
                 </div>
-                <div className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-[10px] font-semibold uppercase">
+                <div className="bg-teal-50 text-teal-750 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
                   {draft.language === "ur" ? "اردو" : draft.language === "ar" ? "عربی" : "انگلش"}
                 </div>
               </div>
@@ -187,7 +187,7 @@ export default function DraftsHistory({
 
                   <button
                     onClick={() => onSelectDraft(draft)}
-                    className="flex items-center gap-1 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-nastaleeq transition cursor-pointer"
+                    className="flex items-center gap-1 text-xs bg-teal-50 text-teal-700 hover:bg-teal-100/80 px-3 py-1.5 rounded-lg font-nastaleeq transition cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     ترمیم کریں

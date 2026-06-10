@@ -5,6 +5,12 @@
   --font-sans: "Inter", "Noto Naskh Arabic", system-ui, sans-serif;
   --font-mono: "Fira Code", monospace;
   --font-nastaleeq: "Noto Nastaliq Urdu", "Noto Naskh Arabic", serif;
+  
+  /* Luxury Custom Colors */
+  --color-brand-primary: #0f766e; /* Deep Teal */
+  --color-brand-primary-hover: #115e59;
+  --color-brand-secondary: #4f46e5; /* Royal Indigo */
+  --color-brand-accent: #b45309; /* Deep Amber */
 }
 
 /* Custom responsive utility classes */
@@ -18,10 +24,35 @@
   line-height: 1.9 !important;
 }
 
-/* Base styling */
+/* Custom scrollbar for premium touch */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Base styling with a luxury off-white canvas and comfortable line spacing */
 body {
   font-family: var(--font-sans);
-  background-color: #f8fafc;
+  background-color: #fcfdfd;
   color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* Custom Selection highlight */
+::selection {
+  background-color: #ccfbf1;
+  color: #115e59;
+}
+
 

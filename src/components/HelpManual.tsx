@@ -9,15 +9,15 @@ export default function HelpManual() {
   return (
     <div className="max-w-4xl mx-auto space-y-8 p-1 sm:p-4 text-right" dir="rtl">
       {/* Hero Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-8 rounded-2xl shadow-md border border-indigo-550 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="bg-gradient-to-r from-teal-700 via-teal-800 to-indigo-800 text-white p-8 rounded-2xl shadow-md border border-teal-650 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="space-y-3">
           <h1 className="text-3xl font-nastaleeq font-bold leading-relaxed">رہنمائی اور استعمال کا طریقہ</h1>
-          <p className="text-indigo-100 max-w-xl text-base leading-relaxed">
+          <p className="text-teal-50 max-w-xl text-base leading-relaxed">
             اردو وائس رائٹر اور پی ڈی ایف ایکسٹریکٹر کو نہایت مہارت اور تیزی سے پبلشنگ گریڈ کمپوزنگ کے لیے تیار کیا گیا ہے۔
           </p>
         </div>
         <div className="bg-white/10 p-4 rounded-full">
-          <BookOpen className="w-16 h-16 text-indigo-50" />
+          <BookOpen className="w-16 h-16 text-teal-100" />
         </div>
       </div>
 
@@ -25,9 +25,9 @@ export default function HelpManual() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Voice writer instructions */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-          <div className="flex items-center gap-3 text-blue-600">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Mic className="w-6 h-6" />
+          <div className="flex items-center gap-3 text-teal-700">
+            <div className="p-2 bg-teal-50 rounded-lg">
+              <Mic className="w-6 h-6 text-teal-600" />
             </div>
             <h2 className="text-xl font-bold font-nastaleeq leading-relaxed">1۔ آواز سے لکھنے کا طریقہ (وائس ٹائپنگ)</h2>
           </div>
@@ -88,9 +88,9 @@ export default function HelpManual() {
           ہماری ٹیمپلیٹ میں پبلشنگ کے روزمرہ ٹاسکس کو بہت آسان بنایا گیا ہے۔ لکھے گئے مواد کے بالکل نیچے کچھ فوری بٹن موجود ہیں:
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-1">
-            <div className="font-semibold text-slate-800 flex items-center gap-1.5 justify-start">
-              <Clipboard className="w-4 h-4 text-blue-500" />
+          <div className="bg-[#fbfcfa] p-4 rounded-xl border border-slate-150 space-y-1 shadow-xs">
+            <div className="font-bold text-slate-800 flex items-center gap-1.5 justify-start">
+              <Clipboard className="w-4 h-4 text-teal-600" />
               کلاؤڈ کاپی (Copy)
             </div>
             <p className="text-slate-500 leading-relaxed">پورے مواد کو صرف ایک کلک پر عارضی اسکرین کلپ بورڈ میں محفوظ کریں تاکہ ایم ایس ورڈ میں جا کر فائنل فارمیٹ کر سکیں ۔</p>
