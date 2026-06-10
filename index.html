@@ -12,9 +12,17 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('PWA ServiceWorker registered with scope:', reg.scope))
-            .catch(err => console.error('PWA ServiceWorker registration failed:', err));
+          // Skip registering on AI Studio proxy domains to avoid the OAuth redirect restriction
+          const isAiStudio = window.location.hostname.includes('.run.app') || 
+                             window.location.hostname.includes('aistudio');
+          
+          if (!isAiStudio) {
+            navigator.serviceWorker.register('/sw.js')
+              .then(reg => console.log('PWA ServiceWorker registered with scope:', reg.scope))
+              .catch(err => console.warn('PWA ServiceWorker registration details:', err.message));
+          } else {
+            console.log('AI Studio Preview window: PWA ServiceWorker registration bypassed to avoid authentication redirect restriction.');
+          }
         });
       }
     </script>
