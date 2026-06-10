@@ -47,8 +47,8 @@ export default function PdfExtractor({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [ocrMode, setOcrMode] = useState<"ai_ocr" | "direct_text">("ai_ocr");
   const [rangeMode, setRangeMode] = useState<"current" | "range" | "all">("current");
-  const [startPageRange, setStartPageRange] = useState<number>(1);
-  const [endPageRange, setEndPageRange] = useState<number>(1);
+  const [startPageRange, setStartPageRange] = useState<number | "">("");
+  const [endPageRange, setEndPageRange] = useState<number | "">("");
 
   // Extraction Execution states
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -103,7 +103,8 @@ export default function PdfExtractor({
           const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
           setPdfDocument(pdf);
           setTotalPages(pdf.numPages);
-          setEndPageRange(pdf.numPages);
+          setStartPageRange("");
+          setEndPageRange("");
         } catch (error: any) {
           console.error("Pdf load error:", error);
           setErrorMessage(`پی ڈی ایف فائل کھولنے میں ناکامی: ${error.message || error}`);
@@ -207,8 +208,13 @@ export default function PdfExtractor({
       start = currentPage;
       end = currentPage;
     } else if (rangeMode === "range") {
-      start = Math.max(1, startPageRange);
-      end = Math.min(totalPages, endPageRange);
+      if (startPageRange === "" || endPageRange === "") {
+        setErrorMessage("براہِ کرم خاص صفحات کی رینج (صفحہ نمبر اور آخری صفحہ) درج کریں۔");
+        setIsProcessing(false);
+        return;
+      }
+      start = Math.max(1, typeof startPageRange === "number" ? startPageRange : 1);
+      end = Math.min(totalPages, typeof endPageRange === "number" ? endPageRange : totalPages);
     } else {
       start = 1;
       end = totalPages;
@@ -537,7 +543,11 @@ export default function PdfExtractor({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setRangeMode("range")}
+                  onClick={() => {
+                    setRangeMode("range");
+                    setStartPageRange("");
+                    setEndPageRange("");
+                  }}
                   className={`py-2.5 rounded-xl text-xs font-bold font-nastaleeq transition cursor-pointer ${
                     rangeMode === "range" ? "bg-gradient-to-tr from-teal-700 to-teal-850 text-white shadow-md shadow-teal-100/40" : "bg-slate-50 text-slate-650 hover:bg-slate-100"
                   }`}
@@ -562,10 +572,13 @@ export default function PdfExtractor({
                     <span className="text-[10px] text-slate-400 font-nastaleeq">تک:</span>
                     <input
                       type="number"
-                      min={startPageRange}
+                      min={typeof startPageRange === "number" ? startPageRange : 1}
                       max={totalPages}
                       value={endPageRange}
-                      onChange={(e) => setEndPageRange(Math.min(totalPages, Math.max(startPageRange, parseInt(e.target.value) || 1)))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEndPageRange(val === "" ? "" : Math.min(totalPages, Math.max(1, parseInt(val) || 1)));
+                      }}
                       className="w-12 text-center bg-transparent text-xs font-mono font-bold border-none outline-none"
                     />
                   </div>
@@ -576,7 +589,10 @@ export default function PdfExtractor({
                       min={1}
                       max={totalPages}
                       value={startPageRange}
-                      onChange={(e) => setStartPageRange(Math.min(totalPages, Math.max(1, parseInt(e.target.value) || 1)))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setStartPageRange(val === "" ? "" : Math.min(totalPages, Math.max(1, parseInt(val) || 1)));
+                      }}
                       className="w-12 text-center bg-transparent text-xs font-mono font-bold border-none outline-none"
                     />
                   </div>
