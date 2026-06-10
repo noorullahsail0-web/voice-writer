@@ -288,7 +288,16 @@ export default function PdfExtractor({
               body: JSON.stringify({ image: base64, mimeType }),
             });
 
-            const data = await response.json();
+            const contentType = response.headers.get("content-type") || "";
+            let data: any = {};
+            if (contentType.includes("application/json")) {
+              data = await response.json();
+            } else {
+              const textResponse = await response.text();
+              const plainText = textResponse.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().substring(0, 300);
+              data = { error: plainText || `سرور کی طرف سے غیر متوقع جواب ملا (Status: ${response.status})` };
+            }
+
             if (!response.ok) {
               throw new Error(data.error || "سرور او سی آر رد ہوا۔");
             }
