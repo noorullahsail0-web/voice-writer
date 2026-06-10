@@ -25,10 +25,19 @@ import {
 } from "lucide-react";
 
 // Dynamically import pdfjs safely
-import * as pdfjsLib from "pdfjs-dist";
+import * as pdfjsLibFallback from "pdfjs-dist";
 
-// Set worker path cleanly using standard unpkg CDN for stable version 4.4.168
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
+// Safely resolve pdfjsLib from global window CDN or fallback to node package
+const pdfjsLib = (typeof window !== "undefined" && (window as any).pdfjsLib)
+  ? (window as any).pdfjsLib
+  : pdfjsLibFallback;
+
+if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 
+    (typeof window !== "undefined" && (window as any).pdfjsLib)
+      ? "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"
+      : "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
+}
 
 interface PdfExtractorProps {
   activeDraft: ComposerDraft;
