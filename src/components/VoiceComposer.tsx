@@ -87,7 +87,15 @@ export default function VoiceComposer({
       rec.onerror = (event: any) => {
         console.error("Speech Recognition Error:", event.error);
         if (event.error === "not-allowed") {
-          setErrorMessage("مائیکروفون کے استعمال کی اجازت مسترد کر دی گئی ہے۔ براہ کرم براؤزر کی سیٹننگز فائل میں جا کر اجازت دیں۔");
+          setErrorMessage("مائیکروفون (آواز) کے استعمال کی اجازت مسترد یا بلاک کر دی گئی ہے۔ (Speech Recognition Error: not-allowed)");
+        } else if (event.error === "no-speech") {
+          setErrorMessage("براہِ کرم کچھ بولیں! مائیکروفون پر کوئی آواز سنائی نہیں دی (Speech Recognition Error: no-speech).");
+        } else if (event.error === "audio-capture") {
+          setErrorMessage("مائیکروفون یا آواز ریکارڈنگ ڈیوائس کا مسئلہ حل کریں (Audio-capture error).");
+        } else if (event.error === "network") {
+          setErrorMessage("براہِ راست آواز سروس کے لیے انٹرنیٹ کنکشن کا مسئلہ ہے (Network connection error).");
+        } else if (event.error === "aborted") {
+          console.log("Speech recognition was aborted.");
         } else {
           setErrorMessage(`سپیچ ریکیگنیشن میں غلطی: ${event.error}`);
         }
@@ -142,7 +150,7 @@ export default function VoiceComposer({
   };
 
   // Toggle client-side Web Speech Recognition
-  const toggleWebSpeech = () => {
+  const toggleWebSpeech = async () => {
     if (!recognitionRef.current) {
       setErrorMessage("آپ کا موجودہ براؤزر براہِ راست آواز سروس کو سپورٹ نہیں کرتا۔ آپ متبادل 'اعلیٰ کوالٹی جیمنی ریکارڈنگ' استعمال کریں۔");
       return;
@@ -156,9 +164,19 @@ export default function VoiceComposer({
       }
       setErrorMessage("");
       try {
+        // Explicitly request microphone permission first to trigger browser permission dialog
+        const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Close the stream tracks immediately so it doesn't block the SpeechRecognition engine
+        tempStream.getTracks().forEach((track) => track.stop());
+
         recognitionRef.current.start();
-      } catch (err) {
+      } catch (err: any) {
         console.error("Start speech failed:", err);
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          setErrorMessage("مائیکروفون (آواز) کے استعمال کی اجازت مسترد یا بلاک کر دی گئی ہے۔ (Speech Recognition Error: not-allowed)");
+        } else {
+          setErrorMessage(`سپیع سروس شروع کرنے میں دشواری پیش آئی: ${err.message || err}`);
+        }
         recognitionRef.current.stop();
       }
     }
@@ -692,9 +710,39 @@ export default function VoiceComposer({
 
           {/* Error Message display */}
           {errorMessage && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs font-bold leading-normal font-nastaleeq text-right flex items-center justify-start gap-2 animate-bounce">
-              <span className="w-2 h-2 bg-red-650 rounded-full animate-ping shrink-0 m-1"></span>
-              <span>{errorMessage}</span>
+            <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl text-xs font-bold leading-normal font-nastaleeq text-right flex flex-col gap-3 transition-all duration-300">
+              <div className="flex items-center justify-start gap-2">
+                <span className="w-2 h-2 bg-red-600 rounded-full animate-ping shrink-0 m-1"></span>
+                <span>{errorMessage}</span>
+              </div>
+              
+              {/* Special guidance for no-speech detected error */}
+              {errorMessage.includes("no-speech") && (
+                <div className="bg-blue-50/90 border border-blue-200 text-blue-950 p-3.5 rounded-lg text-xs leading-relaxed space-y-1.5 text-right" dir="rtl">
+                  <span className="text-blue-900 font-bold block mb-1">💡 آواز ریکارڈ کرنے کے لیے مددگار معلومات:</span>
+                  <p>
+                    ہمارے سسٹم کو آپ کے مائیکروفون سے کوئی آواز موصول نہیں ہوئی۔ برائے مہربانی دوبارہ بٹن دبائیں اور بولنا شروع کریں۔
+                  </p>
+                  <p>
+                    اگر آپ کے پاس ایک سے زائد مائیکروفون ڈیوائسز ہیں، تو یقینی بنائیں کہ آپ کا منتخب کردہ مائیک کوالٹی کے اعتبار سے چالو (unmuted) ہے۔
+                  </p>
+                </div>
+              )}
+
+              {/* Special guidance for iframe security limits and microphone access */}
+              {(errorMessage.includes("not-allowed") || errorMessage.includes("مائیکروفون") || errorMessage.includes("سپیچ")) && !errorMessage.includes("no-speech") && (
+                <div className="bg-amber-50/80 border border-amber-200 text-amber-900 p-3.5 rounded-lg text-xs leading-relaxed space-y-2">
+                  <span className="text-amber-850 font-bold block">💡 مائیکروفون کا مسئلہ حل کرنے کا آسان طریقہ:</span>
+                  <div className="space-y-1.5 text-right" dir="rtl">
+                    <p>
+                      <strong>۱۔ ایپ نئے ٹیب میں چلائیں:</strong> کیونکہ یہ ایپ ابھی گوگل AI Studio کے فریم (iframe) کے اندر چل رہی ہے، براؤزر مائیکروفون کی پرمیشن بلاک کر دیتا ہے۔ برائے مہربانی اوپر دائیں پیلے یا سبز بار پر دائیں طرف موجود <span className="text-teal-850 underline">"Open" یا "Open in new tab" (بیرونی یو آر ایل لنک)</span> کے بٹن پر کلک کریں۔
+                    </p>
+                    <p>
+                      <strong>۲۔ براؤزر کی پرمیشن الاؤ کریں:</strong> نئے پبلک ٹیب لنک پر جانے کے بعد، براؤزر کے اوپر ایڈریس بار کے ساتھ بنے ہوئے لاک (Lock 🔒) آئیکن پر کلک کریں اور مائیکروفون (Microphone) کو الاؤ کر دیں۔
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
