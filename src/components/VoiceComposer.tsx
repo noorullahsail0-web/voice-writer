@@ -150,7 +150,7 @@ export default function VoiceComposer({
   };
 
   // Toggle client-side Web Speech Recognition
-  const toggleWebSpeech = async () => {
+  const toggleWebSpeech = () => {
     if (!recognitionRef.current) {
       setErrorMessage("آپ کا موجودہ براؤزر براہِ راست آواز سروس کو سپورٹ نہیں کرتا۔ آپ متبادل 'اعلیٰ کوالٹی جیمنی ریکارڈنگ' استعمال کریں۔");
       return;
@@ -164,20 +164,19 @@ export default function VoiceComposer({
       }
       setErrorMessage("");
       try {
-        // Explicitly request microphone permission first to trigger browser permission dialog
-        const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Close the stream tracks immediately so it doesn't block the SpeechRecognition engine
-        tempStream.getTracks().forEach((track) => track.stop());
-
         recognitionRef.current.start();
       } catch (err: any) {
         console.error("Start speech failed:", err);
         if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
           setErrorMessage("مائیکروفون (آواز) کے استعمال کی اجازت مسترد یا بلاک کر دی گئی ہے۔ (Speech Recognition Error: not-allowed)");
         } else {
-          setErrorMessage(`سپیع سروس شروع کرنے میں دشواری پیش آئی: ${err.message || err}`);
+          setErrorMessage(`سپیچ سروس شروع کرنے میں دشواری پیش آئی: ${err.message || err}`);
         }
-        recognitionRef.current.stop();
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          // Ignore
+        }
       }
     }
   };

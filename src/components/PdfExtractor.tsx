@@ -27,6 +27,9 @@ import {
 // Dynamically import pdfjs safely
 import * as pdfjsLib from "pdfjs-dist";
 
+// @ts-ignore
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
 // Convert Urdu, Arabic, and Persian numerals (e.g. ۱, ۲, ۳) to standard English ASCII digits (1, 2, 3)
 const convertUrduToEnglishDigits = (input: string): string => {
   const map: Record<string, string> = {
@@ -36,18 +39,36 @@ const convertUrduToEnglishDigits = (input: string): string => {
   return input.replace(/[۰-۹٠-٩]/g, (char) => map[char] || char);
 };
 
+// Create a safe, same-origin Blob URL that wraps the real worker file (CDN or local).
+// This is critical because modern browsers forbid loading Web Workers directly from a cross-origin URL (like unpkg or cdnjs),
+// throwing a SecurityError/CORS exception. Creating a dynamic local Blob that imports the real worker via importScripts bypasses this security sandboxing restriction.
+const getSafeWorkerUrl = (url: string): string => {
+  try {
+    const absoluteUrl = url.startsWith("http://") || url.startsWith("https://")
+      ? url
+      : window.location.origin + (url.startsWith("/") ? "" : "/") + url;
+    
+    const blobCode = `importScripts("${absoluteUrl}");`;
+    const blob = new Blob([blobCode], { type: "text/javascript" });
+    return URL.createObjectURL(blob);
+  } catch (e) {
+    console.warn("Error creating Blob URL wrapper for PDF worker:", e);
+    return url;
+  }
+};
+
 // Safely configure and retrieve the PDF.js library instance matching version 4.4.168
 const getPdfjsLib = () => {
   if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
       try {
-        // Use our same-origin copied static worker file (built during Vite compile)
-        // to bypass any cross-origin (CORS) or bundler URL resolving errors in production / Vercel.
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        console.log("PDF.js local Worker configured statically from /pdf.worker.min.mjs.");
+        // Configure safe unpkg worker via the Blob URL wrapper as the default
+        const cdnUrl = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
+        pdfjsLib.GlobalWorkerOptions.workerSrc = getSafeWorkerUrl(cdnUrl);
+        console.log("PDF.js CDN Worker configured safely via Blob URL.");
       } catch (e) {
-        console.warn("Error setting local PDF.js worker, falling back to CDN:", e);
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
+        console.warn("Error setting safe local PDF.js worker:", e);
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
       }
     }
   }
@@ -125,14 +146,42 @@ export default function PdfExtractor({
         try {
           const typedArray = new Uint8Array(fileReader.result as ArrayBuffer);
           const pdfjs = getPdfjsLib();
-          const pdf = await pdfjs.getDocument({ data: typedArray }).promise;
+          
+          const workersToTry = [
+            "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs",
+            "/pdf.worker.min.mjs",
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs",
+            pdfjsWorker || ""
+          ].filter(Boolean);
+
+          let pdf = null;
+          let loadError = null;
+
+          for (const rawUrl of workersToTry) {
+            try {
+              console.log(`Trying to initialize PDF.js worker with source: ${rawUrl}`);
+              pdfjs.GlobalWorkerOptions.workerSrc = getSafeWorkerUrl(rawUrl);
+              pdf = await pdfjs.getDocument({ data: typedArray }).promise;
+              console.log(`Successfully loaded PDF using worker source: ${rawUrl}`);
+              loadError = null;
+              break;
+            } catch (err: any) {
+              console.warn(`Failed loading PDF with worker source ${rawUrl}:`, err);
+              loadError = err;
+            }
+          }
+
+          if (!pdf) {
+            throw loadError || new Error("All PDF worker fallback targets failed.");
+          }
+
           setPdfDocument(pdf);
           setTotalPages(pdf.numPages);
           setStartPageRange("");
           setEndPageRange("");
         } catch (error: any) {
           console.error("Pdf load error:", error);
-          setErrorMessage(`پی ڈی ایف فائل کھولنے میں ناکامی: ${error.message || error}`);
+          setErrorMessage(`پی ڈی ایف فائل کھولنے میں ناکامی: ${error.message || error}. براہ کرم تصدیق کریں کہ فائل خراب نہیں ہے یا متبادل پی ڈی ایف آزمائیں۔`);
         }
       };
       fileReader.readAsArrayBuffer(pdfFile);
