@@ -253,15 +253,15 @@ export default function PdfExtractor({
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvasing context issue");
 
-    // Standard high-res visual scaling for precise small OCR text
-    const viewport = page.getViewport({ scale: 1.4 });
+    // Optimized visual scaling for precise OCR text extraction to fit within Vercel timeout constraints
+    const viewport = page.getViewport({ scale: 1.15 });
     canvas.height = viewport.height;
     canvas.width = viewport.width;
 
     await page.render({ canvasContext: context, viewport: viewport }).promise;
 
-    // Output JPEG to reduce data transfer payloads significantly (under 200kb - 500kb per page!)
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.80);
+    // Output optimized JPEG quality to cut payloads significantly (approx. 100kb – 250kb per page!)
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
     const base64 = dataUrl.split(",")[1];
     return { base64, mimeType: "image/jpeg" };
   };

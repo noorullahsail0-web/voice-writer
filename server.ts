@@ -301,8 +301,15 @@ app.post("/api/transcribe-audio", async (req, res) => {
 
 // Configure Vite integration
 async function startServer() {
+  if (process.env.VERCEL) {
+    console.log("[Urdu VoiceWriter Backend] Running in Vercel. Dynamic loading and port listening bypassed.");
+    return;
+  }
+
   if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
+    // Hide 'vite' import string from static bundlers to avoid runtime resolution crash on production pruning
+    const viteModuleName = "vite";
+    const { createServer: createViteServer } = await import(viteModuleName);
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -316,11 +323,9 @@ async function startServer() {
     });
   }
 
-  if (!process.env.VERCEL) {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`[Urdu VoiceWriter Backend] Server running on http://0.0.0.0:${PORT}`);
-    });
-  }
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`[Urdu VoiceWriter Backend] Server running on http://0.0.0.0:${PORT}`);
+  });
 }
 
 startServer();
