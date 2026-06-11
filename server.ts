@@ -70,19 +70,17 @@ async function generateContentWithRetryAndFallback(params: {
 }) {
   const ai = getGeminiClient();
   const isVercel = !!process.env.VERCEL;
-  const primary = isVercel ? "gemini-flash-latest" : (params.primaryModel || "gemini-3.5-flash");
+  const primary = params.primaryModel || "gemini-3.5-flash";
   
   // High-availability alternate fallback models
-  const modelsToTry = isVercel
-    ? ["gemini-flash-latest", "gemini-3.1-flash-lite"]
-    : [primary, "gemini-3.1-flash-lite", "gemini-flash-latest"];
+  const modelsToTry = [primary, "gemini-3.1-flash-lite", "gemini-flash-latest"];
   
   let lastError: any = null;
   
   for (const model of modelsToTry) {
-    // On Vercel, we only do 1 attempt per model (no retries) to save precious seconds
-    let retries = isVercel ? 1 : 2; 
-    let delay = isVercel ? 0 : 1000; // no delay on Vercel to preserve execution budget
+    // 2 attempts per model with short delays preserves execution budget and adds ultimate failure protection
+    let retries = 2; 
+    let delay = isVercel ? 500 : 1000; 
     
     while (retries > 0) {
       try {
@@ -213,7 +211,7 @@ app.post("/api/ocr-page", async (req, res) => {
     const isVercel = !!process.env.VERCEL;
 
     const response = await generateContentWithRetryAndFallback({
-      primaryModel: isVercel ? "gemini-3.1-flash-lite" : "gemini-3.5-flash",
+      primaryModel: "gemini-3.5-flash",
       contents: { parts: [imagePart, { text: prompt }] },
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },

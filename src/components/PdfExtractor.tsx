@@ -42,31 +42,69 @@ const convertUrduToEnglishDigits = (input: string): string => {
 // Create a safe, same-origin Blob URL that wraps the real worker file (CDN or local).
 // This is critical because modern browsers forbid loading Web Workers directly from a cross-origin URL (like unpkg or cdnjs),
 // throwing a SecurityError/CORS exception. Creating a dynamic local Blob that imports the real worker via import/importScripts bypasses this security sandboxing restriction.
+// Promise to hold the fetched worker Blob URL
+let workerBlobUrlPromise: Promise<string> | null = null;
+let resolvedWorkerBlobUrl: string | null = null;
+
+// Function to fetch worker code as raw text and compile into a safe Blob URL
+const getWorkerBlobUrl = (): Promise<string> => {
+  if (workerBlobUrlPromise) {
+    return workerBlobUrlPromise;
+  }
+
+  workerBlobUrlPromise = (async () => {
+    // Try local /pdf.worker.min.mjs first (pre-copied to /public by our Vite copier plugin),
+    // then CDN services as reliable high-availability and safe fallbacks.
+    const urlsToTry = [
+      "/pdf.worker.min.mjs",
+      "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs",
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs"
+    ];
+
+    for (const url of urlsToTry) {
+      try {
+        console.log(`[Worker Fetch] Trying to fetch worker from: ${url}`);
+        const targetUrl = url.startsWith("/") ? window.location.origin + url : url;
+        const response = await fetch(targetUrl);
+        if (response.ok) {
+          const code = await response.text();
+          const blob = new Blob([code], { type: "text/javascript" });
+          const blobUrl = URL.createObjectURL(blob);
+          console.log(`[Worker Fetch] Success! Compiled worker Blob URL: ${blobUrl}`);
+          resolvedWorkerBlobUrl = blobUrl;
+          return blobUrl;
+        }
+      } catch (err) {
+        console.warn(`[Worker Fetch] Failed for ${url}:`, err);
+      }
+    }
+
+    console.warn("[Worker Fetch] All fetch attempts failed. Falling back to direct URL.");
+    return "/pdf.worker.min.mjs";
+  })();
+
+  return workerBlobUrlPromise;
+};
+
+// Eagerly pre-warm the worker fetch in background so it is parsed and ready
+if (typeof window !== "undefined") {
+  getWorkerBlobUrl().catch((err) => console.error("[Worker Pre-warm] Failed:", err));
+}
+
 const getSafeWorkerUrl = (url: string): string => {
   try {
     const isAbsolute = url.startsWith("http://") || url.startsWith("https://");
-    
-    // For same-origin URLs, modern browsers do not restrict Web Workers CORS,
-    // so we can resolve and return the URL directly to let the browser load it natively.
     if (!isAbsolute) {
       return url.startsWith("/") ? url : window.location.origin + "/" + url;
     }
-
-    // Check if the URL is cross-origin but actually points to the same host
     const urlObj = new URL(url);
     if (urlObj.origin === window.location.origin) {
       return urlObj.pathname + urlObj.search;
     }
-
-    // For real cross-origin URLs, use a Blob URL.
-    // Determine if it's an ES Module (.mjs) or a classic script (.js).
-    // In PDF.js 4.x, the default worker is an ES Module (.mjs), which requires 'import' instead of 'importScripts' inside module workers.
     const isEsm = url.endsWith(".mjs") || url.includes("/build/pdf.worker.min.mjs") || url.includes(".mjs?");
-    
     const blobCode = isEsm 
       ? `import "${url}";` 
       : `importScripts("${url}");`;
-      
     const blob = new Blob([blobCode], { type: "text/javascript" });
     return URL.createObjectURL(blob);
   } catch (e) {
@@ -78,20 +116,17 @@ const getSafeWorkerUrl = (url: string): string => {
 // Safely configure and retrieve the PDF.js library instance matching version 4.4.168
 const getPdfjsLib = () => {
   if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
-    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      try {
-        // Try same-origin local worker from public directory first
-        pdfjsLib.GlobalWorkerOptions.workerSrc = getSafeWorkerUrl("/pdf.worker.min.mjs");
-        console.log("PDF.js local worker configured safely.");
-      } catch (e) {
-        console.warn("Error setting safe local PDF.js worker, falling back to CDN:", e);
-        try {
-          const cdnUrl = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
-          pdfjsLib.GlobalWorkerOptions.workerSrc = getSafeWorkerUrl(cdnUrl);
-        } catch (cdnErr) {
-          console.error("Error setting CDN PDF.js worker:", cdnErr);
+    if (!pdfjsLib.GlobalWorkerOptions.workerPort && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      if (resolvedWorkerBlobUrl) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = resolvedWorkerBlobUrl;
+        console.log("PDF.js workerSrc configured synchronously with pre-warmed Blob URL.");
+      } else {
+        // Fallback eager assignment while waiting for the promise
+        getWorkerBlobUrl().then(url => {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = url;
+        }).catch(() => {
           pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        }
+        });
       }
     }
   }
@@ -168,29 +203,52 @@ export default function PdfExtractor({
       fileReader.onload = async () => {
         try {
           const typedArray = new Uint8Array(fileReader.result as ArrayBuffer);
+          
+          // Securely resolve and configure the Web Worker using our safe Blob URL load
+          try {
+            console.log("Awaiting safe worker Blob URL configuration...");
+            const workerBlobUrl = await getWorkerBlobUrl();
+            pdfjsLib.GlobalWorkerOptions.workerPort = null;
+            pdfjsLib.GlobalWorkerOptions.workerSrc = workerBlobUrl;
+            console.log("PDF.js workerSrc successfully assigned via pre-fetched Blob URL.");
+          } catch (workerErr) {
+            console.warn("Error awaiting worker Blob URL, falling back to synchronous config:", workerErr);
+          }
+
           const pdfjs = getPdfjsLib();
           
-          const workersToTry = [
-            "/pdf.worker.min.mjs",
-            pdfjsWorker || "",
-            "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs",
-            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs"
-          ].filter(Boolean);
-
           let pdf = null;
           let loadError = null;
 
-          for (const rawUrl of workersToTry) {
-            try {
-              console.log(`Trying to initialize PDF.js worker with source: ${rawUrl}`);
-              pdfjs.GlobalWorkerOptions.workerSrc = getSafeWorkerUrl(rawUrl);
-              pdf = await pdfjs.getDocument({ data: typedArray }).promise;
-              console.log(`Successfully loaded PDF using worker source: ${rawUrl}`);
-              loadError = null;
-              break;
-            } catch (err: any) {
-              console.warn(`Failed loading PDF with worker source ${rawUrl}:`, err);
-              loadError = err;
+          try {
+            console.log("Attempting to load PDF with configured workerPort/workerSrc...");
+            pdf = await pdfjs.getDocument({ data: typedArray }).promise;
+            console.log("Successfully loaded PDF using configured worker!");
+          } catch (firstErr: any) {
+            console.warn("Initial PDF loading failed, trying fallbacks:", firstErr);
+            loadError = firstErr;
+
+            const workersToTry = [
+              "/pdf.worker.min.mjs",
+              pdfjsWorker || "",
+              "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs",
+              "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs"
+            ].filter(Boolean);
+
+            for (const rawUrl of workersToTry) {
+              try {
+                console.log(`Trying to initialize PDF.js worker fallback with source: ${rawUrl}`);
+                // Clear any prior workerPort so workerSrc is used instead
+                pdfjs.GlobalWorkerOptions.workerPort = null;
+                pdfjs.GlobalWorkerOptions.workerSrc = getSafeWorkerUrl(rawUrl);
+                pdf = await pdfjs.getDocument({ data: typedArray }).promise;
+                console.log(`Successfully loaded PDF using fallback source: ${rawUrl}`);
+                loadError = null;
+                break;
+              } catch (err: any) {
+                console.warn(`Failed loading PDF with fallback source ${rawUrl}:`, err);
+                loadError = err;
+              }
             }
           }
 
