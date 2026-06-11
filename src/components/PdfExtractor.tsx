@@ -41,14 +41,32 @@ const convertUrduToEnglishDigits = (input: string): string => {
 
 // Create a safe, same-origin Blob URL that wraps the real worker file (CDN or local).
 // This is critical because modern browsers forbid loading Web Workers directly from a cross-origin URL (like unpkg or cdnjs),
-// throwing a SecurityError/CORS exception. Creating a dynamic local Blob that imports the real worker via importScripts bypasses this security sandboxing restriction.
+// throwing a SecurityError/CORS exception. Creating a dynamic local Blob that imports the real worker via import/importScripts bypasses this security sandboxing restriction.
 const getSafeWorkerUrl = (url: string): string => {
   try {
-    const absoluteUrl = url.startsWith("http://") || url.startsWith("https://")
-      ? url
-      : window.location.origin + (url.startsWith("/") ? "" : "/") + url;
+    const isAbsolute = url.startsWith("http://") || url.startsWith("https://");
     
-    const blobCode = `importScripts("${absoluteUrl}");`;
+    // For same-origin URLs, modern browsers do not restrict Web Workers CORS,
+    // so we can resolve and return the URL directly to let the browser load it natively.
+    if (!isAbsolute) {
+      return url.startsWith("/") ? url : window.location.origin + "/" + url;
+    }
+
+    // Check if the URL is cross-origin but actually points to the same host
+    const urlObj = new URL(url);
+    if (urlObj.origin === window.location.origin) {
+      return urlObj.pathname + urlObj.search;
+    }
+
+    // For real cross-origin URLs, use a Blob URL.
+    // Determine if it's an ES Module (.mjs) or a classic script (.js).
+    // In PDF.js 4.x, the default worker is an ES Module (.mjs), which requires 'import' instead of 'importScripts' inside module workers.
+    const isEsm = url.endsWith(".mjs") || url.includes("/build/pdf.worker.min.mjs") || url.includes(".mjs?");
+    
+    const blobCode = isEsm 
+      ? `import "${url}";` 
+      : `importScripts("${url}");`;
+      
     const blob = new Blob([blobCode], { type: "text/javascript" });
     return URL.createObjectURL(blob);
   } catch (e) {
@@ -62,13 +80,18 @@ const getPdfjsLib = () => {
   if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
       try {
-        // Configure safe unpkg worker via the Blob URL wrapper as the default
-        const cdnUrl = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
-        pdfjsLib.GlobalWorkerOptions.workerSrc = getSafeWorkerUrl(cdnUrl);
-        console.log("PDF.js CDN Worker configured safely via Blob URL.");
+        // Try same-origin local worker from public directory first
+        pdfjsLib.GlobalWorkerOptions.workerSrc = getSafeWorkerUrl("/pdf.worker.min.mjs");
+        console.log("PDF.js local worker configured safely.");
       } catch (e) {
-        console.warn("Error setting safe local PDF.js worker:", e);
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+        console.warn("Error setting safe local PDF.js worker, falling back to CDN:", e);
+        try {
+          const cdnUrl = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
+          pdfjsLib.GlobalWorkerOptions.workerSrc = getSafeWorkerUrl(cdnUrl);
+        } catch (cdnErr) {
+          console.error("Error setting CDN PDF.js worker:", cdnErr);
+          pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+        }
       }
     }
   }
@@ -148,10 +171,10 @@ export default function PdfExtractor({
           const pdfjs = getPdfjsLib();
           
           const workersToTry = [
-            "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs",
             "/pdf.worker.min.mjs",
-            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs",
-            pdfjsWorker || ""
+            pdfjsWorker || "",
+            "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs",
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs"
           ].filter(Boolean);
 
           let pdf = null;
@@ -254,14 +277,14 @@ export default function PdfExtractor({
     if (!context) throw new Error("Canvasing context issue");
 
     // Optimized visual scaling for precise OCR text extraction to fit within Vercel timeout constraints
-    const viewport = page.getViewport({ scale: 1.15 });
+    const viewport = page.getViewport({ scale: 0.90 });
     canvas.height = viewport.height;
     canvas.width = viewport.width;
 
     await page.render({ canvasContext: context, viewport: viewport }).promise;
 
-    // Output optimized JPEG quality to cut payloads significantly (approx. 100kb – 250kb per page!)
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+    // Output optimized JPEG quality to cut payloads significantly (approx. 60kb – 120kb per page!)
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.70);
     const base64 = dataUrl.split(",")[1];
     return { base64, mimeType: "image/jpeg" };
   };

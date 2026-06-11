@@ -6,7 +6,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -99,7 +99,16 @@ async function generateContentWithRetryAndFallback(params: {
       } catch (error: any) {
         lastError = error;
         const errMsg = String(error.message || "").toLowerCase();
-        const errJson = String(JSON.stringify(error) || "").toLowerCase();
+        let errJson = errMsg;
+        try {
+          errJson = JSON.stringify({
+            message: error.message,
+            status: error.status,
+            code: error.code,
+            details: error.details,
+          });
+        } catch (_) {}
+        errJson = errJson.toLowerCase();
         
         // Check if error is a quota/rate-limit error (429) or resource exhaustion
         const isQuotaExceeded =
@@ -196,6 +205,9 @@ app.post("/api/ocr-page", async (req, res) => {
     const response = await generateContentWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: { parts: [imagePart, { text: prompt }] },
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+      },
     });
 
     const resultText = response.text || "";
@@ -249,6 +261,9 @@ app.post("/api/refine-text", async (req, res) => {
     const response = await generateContentWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: [prompt, text],
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+      },
     });
 
     res.json({ text: response.text || "" });
@@ -290,6 +305,9 @@ app.post("/api/transcribe-audio", async (req, res) => {
     const response = await generateContentWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: { parts: [audioPart, { text: prompt }] },
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+      },
     });
 
     res.json({ text: response.text || "" });
