@@ -69,28 +69,36 @@ async function generateContentWithRetryAndFallback(params: {
   primaryModel?: string;
 }) {
   const ai = getGeminiClient();
-  const primary = params.primaryModel || "gemini-3.5-flash";
+  const isVercel = !!process.env.VERCEL;
+  const primary = isVercel ? "gemini-flash-latest" : (params.primaryModel || "gemini-3.5-flash");
   
   // High-availability alternate fallback models
-  const modelsToTry = [
-    primary,
-    "gemini-3.1-flash-lite",
-    "gemini-flash-latest",
-  ];
+  const modelsToTry = isVercel
+    ? ["gemini-flash-latest", "gemini-3.1-flash-lite"]
+    : [primary, "gemini-3.1-flash-lite", "gemini-flash-latest"];
   
   let lastError: any = null;
   
   for (const model of modelsToTry) {
-    let retries = 2; // 2 attempts per model (initial + 1 retry) to cascade to healthy fallback models faster
-    let delay = 1000; // start with 1s delay
+    // On Vercel, we only do 1 attempt per model (no retries) to save precious seconds
+    let retries = isVercel ? 1 : 2; 
+    let delay = isVercel ? 0 : 1000; // no delay on Vercel to preserve execution budget
     
     while (retries > 0) {
       try {
         console.log(`[Gemini API] Requesting ${model} (Attempts remaining for this model: ${retries})...`);
+        
+        // Safely adjust config if model is not a Gemini 3.5 thinking model
+        let modelConfig = params.config ? { ...params.config } : {};
+        if (!model.startsWith("gemini-3.5") && modelConfig.thinkingConfig) {
+          // Non-3.5 models do not support custom thinkingLevel
+          delete modelConfig.thinkingConfig;
+        }
+        
         const response = await ai.models.generateContent({
           model: model,
           contents: params.contents,
-          config: params.config,
+          config: modelConfig,
         });
         
         // Success! Return the response
@@ -152,7 +160,7 @@ async function generateContentWithRetryAndFallback(params: {
         }
         
         retries--;
-        if (retries > 0) {
+        if (retries > 0 && delay > 0) {
           console.log(`[Status] Model ${model} returned a temporary busy state. Retrying in ${delay}ms...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
           delay *= 1.5; // gentle backoff
@@ -202,8 +210,10 @@ app.post("/api/ocr-page", async (req, res) => {
       },
     };
 
+    const isVercel = !!process.env.VERCEL;
+
     const response = await generateContentWithRetryAndFallback({
-      primaryModel: "gemini-3.5-flash",
+      primaryModel: isVercel ? "gemini-3.1-flash-lite" : "gemini-3.5-flash",
       contents: { parts: [imagePart, { text: prompt }] },
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
