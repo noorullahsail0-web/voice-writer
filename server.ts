@@ -214,9 +214,7 @@ app.post("/api/ocr-page", async (req, res) => {
     const response = await generateContentWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: { parts: [imagePart, { text: prompt }] },
-      config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-      },
+      config: {}, // Allow default model reasoning to map layout structure and transcribe every word without skipping
     });
 
     const resultText = response.text || "";
@@ -270,9 +268,7 @@ app.post("/api/refine-text", async (req, res) => {
     const response = await generateContentWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: [prompt, text],
-      config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-      },
+      config: {}, // Allow default reasoning capabilities to proofread with high accuracy
     });
 
     res.json({ text: response.text || "" });
@@ -294,15 +290,36 @@ app.post("/api/transcribe-audio", async (req, res) => {
     }
 
     const ai = getGeminiClient();
-    const cleanMime = mimeType || "audio/webm";
+    
+    // Normalize and sanitize MIME type for absolute Gemini compatibility
+    let cleanMime = "audio/webm";
+    if (mimeType) {
+      const baseMime = mimeType.split(";")[0].trim().toLowerCase();
+      if (baseMime.includes("webm")) {
+        cleanMime = "audio/webm";
+      } else if (baseMime.includes("mp4") || baseMime.includes("m4a") || baseMime.includes("aac")) {
+        cleanMime = "audio/mp4";
+      } else if (baseMime.includes("ogg")) {
+        cleanMime = "audio/ogg";
+      } else if (baseMime.includes("wav") || baseMime.includes("wave") || baseMime.includes("x-wav")) {
+        cleanMime = "audio/wav";
+      } else if (baseMime.includes("mp3") || baseMime.includes("mpeg")) {
+        cleanMime = "audio/mp3";
+      } else if (baseMime.includes("flac")) {
+        cleanMime = "audio/flac";
+      } else if (baseMime.includes("audio/")) {
+        cleanMime = baseMime;
+      }
+    }
 
     const prompt = 
       "You are a professional audio transcriber. Transcribe this audio recording with maximum precision.\n" +
       "The audio is likely spoken in Urdu (اردو), Arabic (عربی), or English, or a fluid blend of these.\n" +
       "Your instructions:\n" +
       "1. Listen carefully and output the transcription in the correct native scripts. Urdu speech -> Urdu script, Arabic -> Arabic script with exact words, English -> standard Latin script.\n" +
-      "2. Correct speech slip-ups, heavy breathing, hesitation filler words (like 'um', 'uh', 'اہ', 'وں') silences, or repetitive words silently.\n" +
-      "3. Only output the actual spoken words, typeset nicely. Do NOT write any introduction, commentary or meta labels.";
+      "2. If the audio is completely silent, contains only static/rustle/background noise, or has no decipherable speech, respond with absolutely nothing (completely empty). Do NOT explain, and do NOT request files.\n" +
+      "3. Correct speech slip-ups, heavy breathing, hesitation filler words (like 'um', 'uh', 'اہ', 'وں') silences, or repetitive words silently.\n" +
+      "4. Only output the actual spoken words, typeset nicely. Do NOT write any introduction, commentary or meta labels.";
 
     const audioPart = {
       inlineData: {
@@ -314,9 +331,7 @@ app.post("/api/transcribe-audio", async (req, res) => {
     const response = await generateContentWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: { parts: [audioPart, { text: prompt }] },
-      config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-      },
+      config: {}, // Enable full reasoning capabilities to hear every word and syllables accurately
     });
 
     res.json({ text: response.text || "" });

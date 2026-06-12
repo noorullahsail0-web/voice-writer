@@ -241,7 +241,7 @@ export default function VoiceComposer({
       };
 
       mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start(250); // Collect data every 250ms
+      mediaRecorder.start(250); // Collect sound in 250ms chunks for absolute compatibility across all browsers (including iOS Safari)
       setIsGeminiRecording(true);
 
       recordingTimerRef.current = setInterval(() => {

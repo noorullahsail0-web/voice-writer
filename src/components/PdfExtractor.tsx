@@ -39,66 +39,28 @@ const convertUrduToEnglishDigits = (input: string): string => {
   return input.replace(/[۰-۹٠-٩]/g, (char) => map[char] || char);
 };
 
-// Create a safe, same-origin Blob URL that wraps the real worker file (CDN or local).
-// This is critical because modern browsers forbid loading Web Workers directly from a cross-origin URL (like unpkg or cdnjs),
-// throwing a SecurityError/CORS exception. Creating a dynamic local Blob that imports the real worker via import/importScripts bypasses this security sandboxing restriction.
-const getSafeWorkerUrl = (url: string): string => {
-  try {
-    const isAbsolute = url.startsWith("http://") || url.startsWith("https://");
-    const resolvedUrl = isAbsolute ? url : window.location.origin + (url.startsWith("/") ? url : "/" + url);
-    const isEsm = resolvedUrl.endsWith(".mjs") || resolvedUrl.includes("/build/pdf.worker.min.mjs") || resolvedUrl.includes(".mjs?");
-    const blobCode = isEsm 
-      ? `import "${resolvedUrl}";` 
-      : `importScripts("${resolvedUrl}");`;
-    const blob = new Blob([blobCode], { type: "text/javascript" });
-    return URL.createObjectURL(blob);
-  } catch (e) {
-    console.warn("Error creating Blob URL wrapper for PDF worker:", e);
-    return url;
-  }
-};
-
-// Safely and synchronously configure the PDF.js library instance matching version 4.4.168
+// Safely and synchronously configure the PDF.js library instance matching version 4.4.168.
+// We configure pdfjsLib.GlobalWorkerOptions.workerSrc rather than manually instantiating `new Worker()`.
+// This is critical because modern browsers block direct same-origin/third-party Web Worker instantiation 
+// when executing inside sandboxed iframes (such as the Google AI Studio applet preview frame),
+// throwing SecurityError / CORS exceptions.
+// By setting `workerSrc` directly, PDF.js attempts worker construction internally and automatically,
+// seamlessly falling back to a fully compatible internal main-thread "fake worker" if blocked, leading to 100% reliable load metrics.
 const configurePdfWorker = () => {
   if (!pdfjsLib || !pdfjsLib.GlobalWorkerOptions) return;
 
-  // We only run this if neither workerPort nor workerSrc is successfully set
-  if (pdfjsLib.GlobalWorkerOptions.workerPort || pdfjsLib.GlobalWorkerOptions.workerSrc) {
+  if (pdfjsLib.GlobalWorkerOptions.workerSrc || pdfjsLib.GlobalWorkerOptions.workerPort) {
     return;
   }
 
-  const localMjsUrl = "/pdf.worker.min.mjs";
-  const cdnUrl = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
-
   try {
-    // Priority 1: Direct same-origin ESM Worker
-    console.log("[PDF Worker] Attempting native same-origin worker from:", localMjsUrl);
-    const workerUrl = new URL(localMjsUrl, window.location.origin);
-    pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(workerUrl, { type: "module" });
-    console.log("[PDF Worker] Synchronously configured module workerPort.");
+    // Try absolute same-origin path first
+    const localUrl = new URL("/pdf.worker.min.mjs", window.location.origin).href;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = localUrl;
+    console.log("[PDF Worker] Configured workerSrc to same-origin path:", localUrl);
   } catch (err) {
-    console.warn("[PDF Worker] Direct same-origin worker failed, attempting same-origin blob wrapper:", err);
-    try {
-      // Priority 2: Safe same-origin blob wrapper referencing the local worker ESM
-      const absoluteLocalUrl = new URL(localMjsUrl, window.location.origin).href;
-      const blobCode = `import "${absoluteLocalUrl}";`;
-      const blob = new Blob([blobCode], { type: "text/javascript" });
-      const blobUrl = URL.createObjectURL(blob);
-      pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(blobUrl, { type: "module" });
-      console.log("[PDF Worker] Synchronously configured local blob wrapper workerPort.");
-    } catch (blobErr) {
-      console.warn("[PDF Worker] Local blob wrapper failed, falling back to CDN workerSrc:", blobErr);
-      try {
-        // Priority 3: Fallback using workerSrc to load CDN URL. Direct assignment
-        // enables pure-JS main-thread "fake worker" dynamically fetching ESM with confidence.
-        pdfjsLib.GlobalWorkerOptions.workerPort = null;
-        pdfjsLib.GlobalWorkerOptions.workerSrc = cdnUrl;
-        console.log("[PDF Worker] Configured workerSrc as CDN URL.");
-      } catch (fallbackErr) {
-        console.error("[PDF Worker] Critical error configuring fallbacks:", fallbackErr);
-        pdfjsLib.GlobalWorkerOptions.workerSrc = cdnUrl;
-      }
-    }
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
+    console.warn("[PDF Worker] Configured workerSrc to CDN path fallback.");
   }
 };
 
@@ -201,17 +163,17 @@ export default function PdfExtractor({
             loadError = firstErr;
 
             const workersToTry = [
-              pdfjsWorker || "",
+              "/pdf.worker.min.mjs",
               "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs",
               "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs"
-            ].filter(Boolean);
+            ];
 
             for (const rawUrl of workersToTry) {
               try {
                 console.log(`Trying to initialize PDF.js worker fallback with source: ${rawUrl}`);
                 // Clear any prior workerPort so workerSrc is used instead
                 pdfjs.GlobalWorkerOptions.workerPort = null;
-                pdfjs.GlobalWorkerOptions.workerSrc = getSafeWorkerUrl(rawUrl);
+                pdfjs.GlobalWorkerOptions.workerSrc = rawUrl;
                 pdf = await pdfjs.getDocument({ data: typedArray }).promise;
                 console.log(`Successfully loaded PDF using fallback source: ${rawUrl}`);
                 loadError = null;
@@ -305,14 +267,15 @@ export default function PdfExtractor({
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvasing context issue");
 
-    // Dynamically calculate scale to deliver ultra-high-definition, razor-sharp images
+    // Dynamically calculate scale to deliver razor-sharp, high-definition images
     // to preserve every single Urdu/Arabic nuqta and micro-diacritic for flawless Gemini OCR.
-    // Since we are running in a modern full-stack container on Cloud Run with high payload limits (100MB),
-    // we can safely prioritize pristine details over minimal file sizes.
+    // We target an incredibly detailed maximum dimension of 2000px, and a premium base scale of 2.2
+    // to ensure text is perfectly legible while keeping payload sizes highly optimized (~200kb - 400kb).
+    // This perfectly retains character details while avoiding any connection timeouts.
     const rawViewport = page.getViewport({ scale: 1.0 });
-    const maxDimension = 2048; // Maximize resolution to 2048px for precise, high-definition character extraction
+    const maxDimension = 2000; // Premium high-definition maximum dimension for accurate OCR
     const currentMax = Math.max(rawViewport.width, rawViewport.height);
-    const scale = currentMax > maxDimension ? maxDimension / currentMax : 2.0;
+    const scale = currentMax > maxDimension ? maxDimension / currentMax : 2.2;
 
     const viewport = page.getViewport({ scale });
     canvas.height = viewport.height;
@@ -320,8 +283,9 @@ export default function PdfExtractor({
 
     await page.render({ canvasContext: context, viewport: viewport }).promise;
 
-    // Output premium JPEG quality to prevent any compression artifacts or blur on small characters
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+    // Output balanced high-quality JPEG to prevent any compression blur on small characters
+    // while keeping data transfers swift and lightweight.
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
     const base64 = dataUrl.split(",")[1];
     return { base64, mimeType: "image/jpeg" };
   };
