@@ -305,13 +305,14 @@ export default function PdfExtractor({
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvasing context issue");
 
-    // Dynamically calculate scale to limit image sizes so they are extremely lightweight (~80kb)
-    // while keeping them highly legible for Gemini OCR. This prevents connection timeouts 
-    // and proxy payload limit blocks ("Failed to fetch").
+    // Dynamically calculate scale to deliver ultra-high-definition, razor-sharp images
+    // to preserve every single Urdu/Arabic nuqta and micro-diacritic for flawless Gemini OCR.
+    // Since we are running in a modern full-stack container on Cloud Run with high payload limits (100MB),
+    // we can safely prioritize pristine details over minimal file sizes.
     const rawViewport = page.getViewport({ scale: 1.0 });
-    const maxDimension = 1120; // 1120px is crisp, ultra-legible, yet tiny in JPEG size
+    const maxDimension = 2048; // Maximize resolution to 2048px for precise, high-definition character extraction
     const currentMax = Math.max(rawViewport.width, rawViewport.height);
-    const scale = currentMax > maxDimension ? maxDimension / currentMax : 0.90;
+    const scale = currentMax > maxDimension ? maxDimension / currentMax : 2.0;
 
     const viewport = page.getViewport({ scale });
     canvas.height = viewport.height;
@@ -319,8 +320,8 @@ export default function PdfExtractor({
 
     await page.render({ canvasContext: context, viewport: viewport }).promise;
 
-    // Output optimized JPEG quality to cut payloads significantly (approx. 60kb – 120kb per page!)
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.70);
+    // Output premium JPEG quality to prevent any compression artifacts or blur on small characters
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
     const base64 = dataUrl.split(",")[1];
     return { base64, mimeType: "image/jpeg" };
   };

@@ -192,14 +192,15 @@ app.post("/api/ocr-page", async (req, res) => {
     const cleanMime = mimeType || "image/png";
 
     const prompt = 
-      "You are an expert Urdu, Arabic, and English typesetting, OCR, and composing specialist.\n" +
-      "Your task is to transcribe all text of any language from this page image (scanned page image) with 100% fidelity.\n" +
+      "You are an expert Urdu, Arabic, and English typesetting, OCR, and composing specialist with ultimate precision.\n" +
+      "Your task is to transcribe EVERY SINGLE word of any language from this page image (scanned page image) with 100% complete, uncompromised fidelity. No skipping, no omission, and no summarization of any section are allowed.\n" +
       "Follow these rules strictly:\n" +
-      "1. Extract ALL text in its native language. If it is Urdu, transcribe it in Urdu Nastaleeq/Arabic script. If it is Arabic, transcribe in Arabic script with its native vocabulary. If it is English, transcribe in English.\n" +
-      "2. Preserve structural paragraphs, lines, list markers, dialogue dashes, and poem layouts (shair/misra structures).\n" +
-      "3. STRIP OUT and IGNORING ALL decorative borders, page headers (like chapter titles at the margin), page numbers, website URLs, phone numbers printed at the bottom as advertisement watermarks, or diagonal watermark stamps (e.g., 'Do Not Copy', 'Draft', or publisher credit stamps) completely from the output text. Only output actual body content!\n" +
-      "4. Repair typographical and orthographic scan errors seamlessly (for example, connect characters that look broken in scan, join improperly fragmented words, adjust word spacing for a flawless Urdu/Arabic typesetting experience).\n" +
-      "5. DO NOT prefix, suffix, or decorate your response with explanations, translation notes, introductions, or code blocks. Output ONLY the raw extracted document body text.";
+      "1. Transcribe EVERY word of the actual body text completely. NEVER leave out any sentences, paragraphs, dialogue lines, side notes, names, or individual words. If a word or phrase is slightly blurry, faded, or contains scan imperfections, do NOT omit it — transcribe it to the absolute best of your ability using contextual clues to resolve any broken characters.\n" +
+      "2. Extract and preserve ALL text in its native script exactly (transcribe Urdu in elegant Urdu script, Arabic in Arabic script, English in Latin script).\n" +
+      "3. Preserve all structural formatting including structural paragraphs, exact lines, list markers, dialogue dashes, indentation, and classical poetry layouts (e.g., shair / misra structures / hemistiches).\n" +
+      "4. ONLY strip out or ignore decorative border lines, independent page number numbers (if they are clearly page numbers separate from headers), and explicitly external advertisement watermarks (URLs/phone numbers printed on margins). If a line at the top or bottom is a heading, sub-heading, chapter name, or structural part of the narrative content, you MUST transcribe it fully. Do not misclassify actual body text as borders or headers.\n" +
+      "5. Seamlessly correct word boundary irregularities (such as fix improper spacing, join incorrectly fragmented characters, connect broken letters like 'ہو گیا' or 'کر دیا' instead of typing them as separate unreadable chunks) to produce a ready-to-publish, flawless, continuous text sheet.\n" +
+      "6. Absolute literal precision: Do not summarize or paraphrase. Do NOT add any introductions, explanations, translators notes, or markdown backticks enclosing the output. Output ONLY the raw, complete, extracted document body text.";
 
     const imagePart = {
       inlineData: {
