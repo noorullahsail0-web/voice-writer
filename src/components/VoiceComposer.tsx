@@ -51,6 +51,13 @@ export default function VoiceComposer({
   const [errorMessage, setErrorMessage] = useState("");
 
   const recognitionRef = useRef<any>(null);
+  const contentRef = useRef(activeDraft.content);
+
+  // Keep contentRef updated with the active draft's content synchronously
+  useEffect(() => {
+    contentRef.current = activeDraft.content;
+  }, [activeDraft.content]);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -121,8 +128,8 @@ export default function VoiceComposer({
         }
 
         if (finalText) {
-          // Append final result with a space
-          const currentContent = activeDraft.content;
+          // Append final result with a space using the up-to-date ref value to prevent component re-initializations
+          const currentContent = contentRef.current;
           const separator = currentContent && !currentContent.endsWith(" ") ? " " : "";
           onUpdateDraftContent(currentContent + separator + finalText);
         }
@@ -140,7 +147,7 @@ export default function VoiceComposer({
         recognitionRef.current.abort();
       }
     };
-  }, [language, activeDraft.content]);
+  }, [language]);
 
   // Restart speech recognition if language is changed when listening
   const handleLanguageChange = (lang: NativeLanguage) => {
@@ -194,7 +201,28 @@ export default function VoiceComposer({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      
+      // Multi-mime safe detection for MediaRecorder iOS/Safari vs Android/Chrome compatibility
+      let mediaRecorder: MediaRecorder;
+      let chosenMime = "audio/webm";
+      
+      try {
+        mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+        chosenMime = "audio/webm";
+      } catch (err) {
+        try {
+          mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/mp4" });
+          chosenMime = "audio/mp4";
+        } catch (err2) {
+          try {
+            mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/ogg" });
+            chosenMime = "audio/ogg";
+          } catch (err3) {
+            mediaRecorder = new MediaRecorder(stream); // browser default
+            chosenMime = mediaRecorder.mimeType || "audio/wav";
+          }
+        }
+      }
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -203,12 +231,13 @@ export default function VoiceComposer({
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const actualMime = mediaRecorder.mimeType || chosenMime || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
         // Clean stream tracks
         stream.getTracks().forEach((track) => track.stop());
 
-        // Process audio bytes
-        await processAudioBytesWithGemini(audioBlob);
+        // Process audio bytes passing the specific mimeType configured
+        await processAudioBytesWithGemini(audioBlob, actualMime);
       };
 
       mediaRecorderRef.current = mediaRecorder;
@@ -219,8 +248,8 @@ export default function VoiceComposer({
         setRecordingSeconds((prev) => prev + 1);
       }, 1000);
     } catch (err: any) {
-      console.error("Microphone access failed for Gemini:", err);
-      setErrorMessage("مائیکروفون تک رسائی ممکن نہیں ہو سکی۔ براہ کرم اپنے سسٹم اور براؤزر کی مائیکروفون پرمیشن درست کریں۔");
+      console.warn("[Microphone Warning] Microphone access failed for Gemini:", err);
+      setErrorMessage("مائیکروفون تک رسائی ممکن نہیں ہو سکی۔ (پرمیشن بلاک یا کوئی ڈیوائس دستیاب نہیں ہے)");
     }
   };
 
@@ -235,42 +264,50 @@ export default function VoiceComposer({
     }
   };
 
-  const processAudioBytesWithGemini = async (audioBlob: Blob) => {
+  const processAudioBytesWithGemini = async (audioBlob: Blob, mimeTypeToUse: string) => {
     setIsProcessing(true);
     setErrorMessage("");
 
     try {
-      // Convert Blob to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
-      reader.onloadend = async () => {
-        const base64data = (reader.result as string).split(",")[1];
+      // Convert Blob to base64 using a Promise-based Reader
+      const base64data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          try {
+            const base64 = (reader.result as string).split(",")[1];
+            resolve(base64);
+          } catch (e) {
+            reject(e);
+          }
+        };
+        reader.onerror = (e) => reject(e);
+      });
 
-        const response = await fetch("/api/transcribe-audio", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            audio: base64data,
-            mimeType: "audio/webm",
-          }),
-        });
+      const response = await fetch("/api/transcribe-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          audio: base64data,
+          mimeType: mimeTypeToUse,
+        }),
+      });
 
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || "آڈیو پروسیسنگ فیل ہو گئی۔");
-        }
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "آڈیو پروسیسنگ فیل ہو گئی۔");
+      }
 
-        if (data.text) {
-          const trans = data.text.trim();
-          const currentContent = activeDraft.content;
-          const separator = currentContent && !currentContent.endsWith(" ") ? " " : "";
-          onUpdateDraftContent(currentContent + separator + trans);
-        } else {
-          setErrorMessage("آڈیو میں کوئی واضح تحریر سنائی نہیں دی، دوبارہ بولیں۔");
-        }
-      };
+      if (data.text && data.text.trim()) {
+        const trans = data.text.trim();
+        const currentContent = activeDraft.content;
+        const separator = currentContent && !currentContent.endsWith(" ") ? " " : "";
+        onUpdateDraftContent(currentContent + separator + trans);
+      } else {
+        setErrorMessage("آڈیو میں کوئی واضح تحریر سنائی نہیں دی، دوبارہ بولیں۔");
+      }
     } catch (error: any) {
-      console.error(error);
+      console.warn("[transcribe-audio failure info]", error);
       setErrorMessage(error.message || "آڈیو پروسیسنگ کے دوران رابطے کی غلطی پیش آئی۔");
     } finally {
       setIsProcessing(false);
@@ -306,7 +343,7 @@ export default function VoiceComposer({
         onUpdateDraftContent(data.text);
       }
     } catch (error: any) {
-      console.error(error);
+      console.warn("[refine-text failure info]", error);
       setErrorMessage(error.message || "جیمنی ایڈیٹر سروس سے رابطہ منقطع ہے۔");
     } finally {
       setIsProcessing(false);

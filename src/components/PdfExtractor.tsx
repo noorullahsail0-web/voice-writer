@@ -42,69 +42,14 @@ const convertUrduToEnglishDigits = (input: string): string => {
 // Create a safe, same-origin Blob URL that wraps the real worker file (CDN or local).
 // This is critical because modern browsers forbid loading Web Workers directly from a cross-origin URL (like unpkg or cdnjs),
 // throwing a SecurityError/CORS exception. Creating a dynamic local Blob that imports the real worker via import/importScripts bypasses this security sandboxing restriction.
-// Promise to hold the fetched worker Blob URL
-let workerBlobUrlPromise: Promise<string> | null = null;
-let resolvedWorkerBlobUrl: string | null = null;
-
-// Function to fetch worker code as raw text and compile into a safe Blob URL
-const getWorkerBlobUrl = (): Promise<string> => {
-  if (workerBlobUrlPromise) {
-    return workerBlobUrlPromise;
-  }
-
-  workerBlobUrlPromise = (async () => {
-    // Try local /pdf.worker.min.mjs first (pre-copied to /public by our Vite copier plugin),
-    // then CDN services as reliable high-availability and safe fallbacks.
-    const urlsToTry = [
-      "/pdf.worker.min.mjs",
-      "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs",
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs"
-    ];
-
-    for (const url of urlsToTry) {
-      try {
-        console.log(`[Worker Fetch] Trying to fetch worker from: ${url}`);
-        const targetUrl = url.startsWith("/") ? window.location.origin + url : url;
-        const response = await fetch(targetUrl);
-        if (response.ok) {
-          const code = await response.text();
-          const blob = new Blob([code], { type: "text/javascript" });
-          const blobUrl = URL.createObjectURL(blob);
-          console.log(`[Worker Fetch] Success! Compiled worker Blob URL: ${blobUrl}`);
-          resolvedWorkerBlobUrl = blobUrl;
-          return blobUrl;
-        }
-      } catch (err) {
-        console.warn(`[Worker Fetch] Failed for ${url}:`, err);
-      }
-    }
-
-    console.warn("[Worker Fetch] All fetch attempts failed. Falling back to direct URL.");
-    return "/pdf.worker.min.mjs";
-  })();
-
-  return workerBlobUrlPromise;
-};
-
-// Eagerly pre-warm the worker fetch in background so it is parsed and ready
-if (typeof window !== "undefined") {
-  getWorkerBlobUrl().catch((err) => console.error("[Worker Pre-warm] Failed:", err));
-}
-
 const getSafeWorkerUrl = (url: string): string => {
   try {
     const isAbsolute = url.startsWith("http://") || url.startsWith("https://");
-    if (!isAbsolute) {
-      return url.startsWith("/") ? url : window.location.origin + "/" + url;
-    }
-    const urlObj = new URL(url);
-    if (urlObj.origin === window.location.origin) {
-      return urlObj.pathname + urlObj.search;
-    }
-    const isEsm = url.endsWith(".mjs") || url.includes("/build/pdf.worker.min.mjs") || url.includes(".mjs?");
+    const resolvedUrl = isAbsolute ? url : window.location.origin + (url.startsWith("/") ? url : "/" + url);
+    const isEsm = resolvedUrl.endsWith(".mjs") || resolvedUrl.includes("/build/pdf.worker.min.mjs") || resolvedUrl.includes(".mjs?");
     const blobCode = isEsm 
-      ? `import "${url}";` 
-      : `importScripts("${url}");`;
+      ? `import "${resolvedUrl}";` 
+      : `importScripts("${resolvedUrl}");`;
     const blob = new Blob([blobCode], { type: "text/javascript" });
     return URL.createObjectURL(blob);
   } catch (e) {
@@ -113,22 +58,58 @@ const getSafeWorkerUrl = (url: string): string => {
   }
 };
 
-// Safely configure and retrieve the PDF.js library instance matching version 4.4.168
-const getPdfjsLib = () => {
-  if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
-    if (!pdfjsLib.GlobalWorkerOptions.workerPort && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      if (resolvedWorkerBlobUrl) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = resolvedWorkerBlobUrl;
-        console.log("PDF.js workerSrc configured synchronously with pre-warmed Blob URL.");
-      } else {
-        // Fallback eager assignment while waiting for the promise
-        getWorkerBlobUrl().then(url => {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = url;
-        }).catch(() => {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        });
+// Safely and synchronously configure the PDF.js library instance matching version 4.4.168
+const configurePdfWorker = () => {
+  if (!pdfjsLib || !pdfjsLib.GlobalWorkerOptions) return;
+
+  // We only run this if neither workerPort nor workerSrc is successfully set
+  if (pdfjsLib.GlobalWorkerOptions.workerPort || pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    return;
+  }
+
+  const localMjsUrl = "/pdf.worker.min.mjs";
+  const cdnUrl = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
+
+  try {
+    // Priority 1: Direct same-origin ESM Worker
+    console.log("[PDF Worker] Attempting native same-origin worker from:", localMjsUrl);
+    const workerUrl = new URL(localMjsUrl, window.location.origin);
+    pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(workerUrl, { type: "module" });
+    console.log("[PDF Worker] Synchronously configured module workerPort.");
+  } catch (err) {
+    console.warn("[PDF Worker] Direct same-origin worker failed, attempting same-origin blob wrapper:", err);
+    try {
+      // Priority 2: Safe same-origin blob wrapper referencing the local worker ESM
+      const absoluteLocalUrl = new URL(localMjsUrl, window.location.origin).href;
+      const blobCode = `import "${absoluteLocalUrl}";`;
+      const blob = new Blob([blobCode], { type: "text/javascript" });
+      const blobUrl = URL.createObjectURL(blob);
+      pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(blobUrl, { type: "module" });
+      console.log("[PDF Worker] Synchronously configured local blob wrapper workerPort.");
+    } catch (blobErr) {
+      console.warn("[PDF Worker] Local blob wrapper failed, falling back to CDN workerSrc:", blobErr);
+      try {
+        // Priority 3: Fallback using workerSrc to load CDN URL. Direct assignment
+        // enables pure-JS main-thread "fake worker" dynamically fetching ESM with confidence.
+        pdfjsLib.GlobalWorkerOptions.workerPort = null;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = cdnUrl;
+        console.log("[PDF Worker] Configured workerSrc as CDN URL.");
+      } catch (fallbackErr) {
+        console.error("[PDF Worker] Critical error configuring fallbacks:", fallbackErr);
+        pdfjsLib.GlobalWorkerOptions.workerSrc = cdnUrl;
       }
     }
+  }
+};
+
+// Eagerly configure the worker
+if (typeof window !== "undefined") {
+  configurePdfWorker();
+}
+
+const getPdfjsLib = () => {
+  if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+    configurePdfWorker();
   }
   return pdfjsLib;
 };
@@ -204,19 +185,10 @@ export default function PdfExtractor({
         try {
           const typedArray = new Uint8Array(fileReader.result as ArrayBuffer);
           
-          // Securely resolve and configure the Web Worker using our safe Blob URL load
-          try {
-            console.log("Awaiting safe worker Blob URL configuration...");
-            const workerBlobUrl = await getWorkerBlobUrl();
-            pdfjsLib.GlobalWorkerOptions.workerPort = null;
-            pdfjsLib.GlobalWorkerOptions.workerSrc = workerBlobUrl;
-            console.log("PDF.js workerSrc successfully assigned via pre-fetched Blob URL.");
-          } catch (workerErr) {
-            console.warn("Error awaiting worker Blob URL, falling back to synchronous config:", workerErr);
-          }
+          // Configure worker synchronously
+          configurePdfWorker();
 
           const pdfjs = getPdfjsLib();
-          
           let pdf = null;
           let loadError = null;
 
@@ -229,7 +201,6 @@ export default function PdfExtractor({
             loadError = firstErr;
 
             const workersToTry = [
-              "/pdf.worker.min.mjs",
               pdfjsWorker || "",
               "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs",
               "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs"
@@ -334,8 +305,15 @@ export default function PdfExtractor({
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvasing context issue");
 
-    // Optimized visual scaling for precise OCR text extraction to fit within Vercel timeout constraints
-    const viewport = page.getViewport({ scale: 0.90 });
+    // Dynamically calculate scale to limit image sizes so they are extremely lightweight (~80kb)
+    // while keeping them highly legible for Gemini OCR. This prevents connection timeouts 
+    // and proxy payload limit blocks ("Failed to fetch").
+    const rawViewport = page.getViewport({ scale: 1.0 });
+    const maxDimension = 1120; // 1120px is crisp, ultra-legible, yet tiny in JPEG size
+    const currentMax = Math.max(rawViewport.width, rawViewport.height);
+    const scale = currentMax > maxDimension ? maxDimension / currentMax : 0.90;
+
+    const viewport = page.getViewport({ scale });
     canvas.height = viewport.height;
     canvas.width = viewport.width;
 
