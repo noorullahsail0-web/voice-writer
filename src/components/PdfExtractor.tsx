@@ -28,7 +28,7 @@ import {
 import * as pdfjsLib from "pdfjs-dist";
 
 // @ts-ignore
-import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import workerSourceText from "pdfjs-dist/build/pdf.worker.min.mjs?raw";
 
 // Convert Urdu, Arabic, and Persian numerals (e.g. ۱, ۲, ۳) to standard English ASCII digits (1, 2, 3)
 const convertUrduToEnglishDigits = (input: string): string => {
@@ -39,77 +39,37 @@ const convertUrduToEnglishDigits = (input: string): string => {
   return input.replace(/[۰-۹٠-٩]/g, (char) => map[char] || char);
 };
 
-// Safely and synchronously configure the PDF.js library instance matching version 4.4.168 as a fast eager baseline.
+// Synchronously configure the PDF.js library instance to use natively-registered Blob-based worker.
 const configurePdfWorker = () => {
   if (!pdfjsLib || !pdfjsLib.GlobalWorkerOptions) return;
 
-  if (pdfjsLib.GlobalWorkerOptions.workerSrc || pdfjsLib.GlobalWorkerOptions.workerPort) {
-    return;
-  }
-
   try {
-    const localUrl = new URL("/pdf.worker.min.mjs", window.location.origin).href;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = localUrl;
-    console.log("[PDF Worker] Synchronously pre-configured workerSrc baseline.");
+    if (typeof window !== "undefined") {
+      const blob = new Blob([workerSourceText], { type: "text/javascript" });
+      const blobUrl = URL.createObjectURL(blob);
+      const worker = new Worker(blobUrl, { type: "module" });
+      pdfjsLib.GlobalWorkerOptions.workerPort = worker;
+      console.log("[PDF Worker] Pre-configured GlobalWorkerOptions with Native Blob Module Worker successfully!");
+    }
   } catch (err) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
+    console.error("[PDF Worker] Error configuring native same-thread worker fallback, trying classic Worker:", err);
+    try {
+      if (typeof window !== "undefined") {
+        const blob = new Blob([workerSourceText], { type: "text/javascript" });
+        const blobUrl = URL.createObjectURL(blob);
+        const worker = new Worker(blobUrl);
+        pdfjsLib.GlobalWorkerOptions.workerPort = worker;
+        console.log("[PDF Worker] Pre-configured GlobalWorkerOptions with Native Blob Classic Worker successfully!");
+      }
+    } catch (fallbackErr) {
+      console.error("[PDF Worker] Native classic worker fallback failed too:", fallbackErr);
+    }
   }
 };
 
-let cachedWorkerBlobUrl: string | null = null;
-let pendingWorkerPromise: Promise<string> | null = null;
-
-// Fetches the raw worker script text and wraps it inside a local self-contained Blob URL.
-// This is critical because modern browsers strictly prohibit loading Web Workers or dynamic imports (ESMD)
-// from cross-origin or even relative paths when executing within highly restrictive sandboxed iframes (origin="null").
-// By downloading the worker code as standard text (CORS-friendly GET request) and converting it to a Blob,
-// both native Web Worker thread creation and the internal main-thread dynamic-import fallback (`import(blobUrl)`)
-// execute with 100% local self-contained code without triggering any CORS/SecurityError blocks.
-const getWorkerBlobUrl = (): Promise<string> => {
-  if (cachedWorkerBlobUrl) return Promise.resolve(cachedWorkerBlobUrl);
-  if (pendingWorkerPromise) return pendingWorkerPromise;
-
-  pendingWorkerPromise = (async () => {
-    const urlsToFetch = [
-      "/pdf.worker.min.mjs",
-      pdfjsWorker,
-      "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs",
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs"
-    ].filter(Boolean);
-
-    let lastError: any = null;
-    for (const url of urlsToFetch) {
-      try {
-        console.log(`[PDF Worker Setup] Fetching self-contained worker source from: ${url}`);
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        const sourceCode = await response.text();
-        if (!sourceCode || sourceCode.length < 100) {
-          throw new Error("Retrieved empty or invalid worker source text.");
-        }
-        
-        const blob = new Blob([sourceCode], { type: "text/javascript" });
-        cachedWorkerBlobUrl = URL.createObjectURL(blob);
-        console.log("[PDF Worker Setup] Successfully created robust self-contained Worker Blob URL:", cachedWorkerBlobUrl);
-        return cachedWorkerBlobUrl;
-      } catch (err: any) {
-        console.warn(`[PDF Worker Setup] Failed fetching/initiating from ${url}:`, err);
-        lastError = err;
-      }
-    }
-    
-    throw lastError || new Error("Failed to load PDF worker source from all available locations.");
-  })();
-
-  return pendingWorkerPromise;
-};
-
-// Eagerly pre-trigger the async fetch to warm up the cache
+// Eagerly pre-trigger the worker configuration
 if (typeof window !== "undefined") {
   configurePdfWorker();
-  getWorkerBlobUrl().catch((e) => console.warn("[PDF Worker Setup] Background pre-fetch warm up failed, will retry on document load:", e));
 }
 
 const getPdfjsLib = () => {
@@ -191,56 +151,21 @@ export default function PdfExtractor({
           const typedArray = new Uint8Array(fileReader.result as ArrayBuffer);
           const pdfjs = getPdfjsLib();
           
-          // Load self-contained worker blob URL before document loading to completely bypass CORS/sandbox obstacles
-          try {
-            console.log("[PDF loader] Awaiting self-contained worker blob URL preparation...");
-            const blobUrl = await getWorkerBlobUrl();
-            pdfjs.GlobalWorkerOptions.workerPort = null;
-            pdfjs.GlobalWorkerOptions.workerSrc = blobUrl;
-            
-            // Also try to instantiate a native Worker instance using the blob URL
-            try {
-              pdfjs.GlobalWorkerOptions.workerPort = new Worker(blobUrl, { type: "module" });
-              console.log("[PDF loader] Successfully assigned workerPort with module worker.");
-            } catch (workerErr) {
-              console.warn(
-                "[PDF loader] Browser Web Worker creation blocked by iframe restriction. " +
-                "Setting workerPort to null. PDF.js will seamlessly fallback and dynamically import " +
-                "the self-contained same-origin Blob URL on the main thread (fake worker) without CORS errors:", 
-                workerErr
-              );
-              pdfjs.GlobalWorkerOptions.workerPort = null;
-            }
-          } catch (workerSetupErr: any) {
-            console.error("[PDF loader] Self-contained worker URL fallback failed:", workerSetupErr);
-            configurePdfWorker();
-          }
+          // Ensure MockWorker is correctly initialized and assigned to GlobalWorkerOptions.workerPort
+          configurePdfWorker();
 
           let pdf = null;
-          let loadError = null;
-
           try {
-            console.log("Loading PDF using prepared secure worker config...");
+            console.log("Loading PDF using prepared same-context MockWorker config...");
             pdf = await pdfjs.getDocument({ data: typedArray }).promise;
             console.log("Successfully loaded PDF!");
-          } catch (firstErr: any) {
-            console.warn("PDF loading failed with primary worker setup, trying generic static loader fallback:", firstErr);
-            loadError = firstErr;
-            
-            // Eagerly try to fall back to a standard main-thread fake worker using relative path
-            try {
-              pdfjs.GlobalWorkerOptions.workerPort = null;
-              pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-              pdf = await pdfjs.getDocument({ data: typedArray }).promise;
-              loadError = null;
-            } catch (fallbackErr: any) {
-              console.error("Standard fallback also failed:", fallbackErr);
-              loadError = fallbackErr;
-            }
+          } catch (err: any) {
+            console.error("Error loading PDF via MockWorker:", err);
+            throw err;
           }
 
           if (!pdf) {
-            throw loadError || new Error("All PDF worker fallback targets failed.");
+            throw new Error("All PDF worker fallback targets failed.");
           }
 
           setPdfDocument(pdf);
