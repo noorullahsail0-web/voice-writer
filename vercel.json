@@ -4,17 +4,6 @@
       "maxDuration": 60
     }
   },
-  "headers": [
-    {
-      "source": "/(.*\\.(mjs|js))",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "application/javascript"
-        }
-      ]
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/:path*",
