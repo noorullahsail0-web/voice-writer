@@ -104,6 +104,18 @@ export default function PdfExtractor({
   const [progressList, setProgressList] = useState<OcrPageProgress[]>([]);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
+  const [hasFallbackUsed, setHasFallbackUsed] = useState<boolean>(false);
+
+  // Reverses the character sequence of each individual line to fix reversed digital text extractions
+  const handleReverseUrduText = () => {
+    if (!activeDraft.content) return;
+    const lines = activeDraft.content.split("\n");
+    const reversedLines = lines.map((line) => {
+      // Return reversed line
+      return line.split("").reverse().join("");
+    });
+    onUpdateDraftContent(reversedLines.join("\n"));
+  };
 
   // For visual splitting preview on left
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -275,6 +287,7 @@ export default function PdfExtractor({
 
     setIsProcessing(true);
     setErrorMessage("");
+    setHasFallbackUsed(false);
     isAbortedRef.current = false;
 
     // Compute range boundaries
@@ -408,6 +421,7 @@ export default function PdfExtractor({
           if (fallbackText && fallbackText.trim().length > 0) {
             cleanPageText = fallbackText;
             isSuccess = true;
+            setHasFallbackUsed(true);
             console.log(`Page ${pageNum} digital text fallback succeeded!`);
           } else {
             // Keep the original OCR error, but append info about scanned page fallback failure!
@@ -714,6 +728,32 @@ export default function PdfExtractor({
             </div>
           </div>
 
+          {/* Fallback warning box with explanation */}
+          {hasFallbackUsed && (
+            <div className="bg-amber-50 border border-amber-300 text-amber-955 p-5 rounded-3xl text-xs space-y-2.5 leading-relaxed text-right font-nastaleeq" dir="rtl">
+              <div className="font-bold flex items-center justify-start gap-1.5 text-amber-950 font-nastaleeq text-sm">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>اہم معلوماتی الرٹ: براہِ راست متن نکالا گیا (کمپیوٹر ریڈر متبادل)</span>
+              </div>
+              <p className="text-[11px] text-slate-705">
+                ورسل (Vercel) پر جیمنی کی <strong>(GEMINI_API_KEY)</strong> سیٹ نہ ہونے یا حد ختم ہونے کی وجہ سے ایپ نے پی ڈی ایف فائل کے اندر سے براہِ راست الفاظ پڑھے ہیں۔ چونکہ بہت سی پرانی اردو کتابوں اور پی ڈی ایف فائلوں میں حروف کو تکنیکی طور پر الٹا (Reverse) محفوظ کیا جاتا ہے، اس لیے یہاں کچھ الفاظ الٹے ہو گئے ہیں۔
+              </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleReverseUrduText}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-nastaleeq px-3 py-1.5 rounded-lg font-bold text-[11px] transition flex items-center gap-1 cursor-pointer shadow-sm"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  لکھائی سیدھی کریں
+                </button>
+                <span className="text-[10px] text-amber-800 font-nastaleeq">
+                  * مستقل اور بہترین حل یہ ہے کہ اپنے ورسل ڈیش بورڈ میں جا کر <strong>GEMINI_API_KEY</strong> سیٹ کریں تاکہ جیمنی بصری او سی آر (AI OCR) سے جادوئی تحریر حاصل ہو۔
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* SPLIT SCREEN PREVIEW: Original vs OCR Output results */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[550px]">
             
@@ -848,6 +888,15 @@ export default function PdfExtractor({
           {/* Quick Actions Shelf below split screens: Copy, Word Document wrapper */}
           {activeDraft.content && (
             <div className="flex flex-wrap items-center justify-end gap-2 text-xs pt-2">
+              <button
+                type="button"
+                onClick={handleReverseUrduText}
+                className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white border border-amber-550 px-4 py-2.5 rounded-xl font-nastaleeq font-bold transition cursor-pointer shadow-sm"
+              >
+                <RotateCcw className="w-4.5 h-4.5 shrink-0 text-white" />
+                لکھائی سیدھی کریں (Reverse)
+              </button>
+
               <button
                 onClick={() => onUpdateDraftContent("")}
                 className="flex items-center gap-1.5 bg-white hover:bg-rose-50 border border-slate-250 text-slate-650 hover:text-rose-600 px-4 py-2.5 rounded-xl font-nastaleeq font-bold transition cursor-pointer"
