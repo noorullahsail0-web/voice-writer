@@ -95,6 +95,7 @@ export default function PdfExtractor({
   const [totalPages, setTotalPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [ocrMode, setOcrMode] = useState<"ai_ocr" | "direct_text">("ai_ocr");
+  const [ocrResolution, setOcrResolution] = useState<"speed" | "hq">("speed");
   const [rangeMode, setRangeMode] = useState<"current" | "range" | "all">("current");
   const [startPageRange, setStartPageRange] = useState<number | "">("");
   const [endPageRange, setEndPageRange] = useState<number | "">("");
@@ -264,9 +265,14 @@ export default function PdfExtractor({
     // to ensure text is perfectly legible while keeping payload sizes highly optimized (~200kb - 400kb).
     // This perfectly retains character details while avoiding any connection timeouts.
     const rawViewport = page.getViewport({ scale: 1.0 });
-    const maxDimension = 2000; // Premium high-definition maximum dimension for accurate OCR
+    
+    // Dynamically calculate scale based on the speed (low-latency Vercel friendly) or HD settings
+    const isSpeed = ocrResolution === "speed";
+    const maxDimension = isSpeed ? 1300 : 2000;
+    const baseScale = isSpeed ? 1.4 : 2.2;
+    
     const currentMax = Math.max(rawViewport.width, rawViewport.height);
-    const scale = currentMax > maxDimension ? maxDimension / currentMax : 2.2;
+    const scale = currentMax > maxDimension ? maxDimension / currentMax : baseScale;
 
     const viewport = page.getViewport({ scale });
     canvas.height = viewport.height;
@@ -274,9 +280,8 @@ export default function PdfExtractor({
 
     await page.render({ canvasContext: context, viewport: viewport }).promise;
 
-    // Output balanced high-quality JPEG to prevent any compression blur on small characters
-    // while keeping data transfers swift and lightweight.
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+    // Use tighter compression on speed mode (0.8) to dramatically reduce transmission payload sizes
+    const dataUrl = canvas.toDataURL("image/jpeg", isSpeed ? 0.8 : 0.88);
     const base64 = dataUrl.split(",")[1];
     return { base64, mimeType: "image/jpeg" };
   };
@@ -336,6 +341,8 @@ export default function PdfExtractor({
 
       let cleanPageText = "";
       let isSuccess = false;
+      let pageFallbackUsed = false;
+      let originalOcrErrorText = "";
       const maxAttempts = 3;
       let delayMs = 1500;
       let lastErrMessage = "پروسیسنگ فیل۔";
@@ -406,6 +413,7 @@ export default function PdfExtractor({
         try {
           console.log(`Page ${pageNum} AI OCR failed. Attempting digital text fallback extraction...`);
           const originalOcrError = lastErrMessage;
+          originalOcrErrorText = lastErrMessage;
           updatePageProgress(
             pageNum,
             "processing",
@@ -421,6 +429,7 @@ export default function PdfExtractor({
           if (fallbackText && fallbackText.trim().length > 0) {
             cleanPageText = fallbackText;
             isSuccess = true;
+            pageFallbackUsed = true;
             setHasFallbackUsed(true);
             console.log(`Page ${pageNum} digital text fallback succeeded!`);
           } else {
@@ -434,7 +443,14 @@ export default function PdfExtractor({
       }
 
       if (isSuccess) {
-        updatePageProgress(pageNum, "success", cleanPageText);
+        updatePageProgress(
+          pageNum,
+          "success",
+          cleanPageText,
+          pageFallbackUsed ? `متبادل متن حاصل کیا گیا۔ اصل او سی آر کی خرابی: ${originalOcrErrorText}` : undefined,
+          pageFallbackUsed,
+          originalOcrErrorText || undefined
+        );
 
         // Safely accumulate content and dispatch state update to the parent draft
         if (cleanPageText) {
@@ -447,7 +463,7 @@ export default function PdfExtractor({
         }
 
         // Wait for a small segment if we are in AI OCR mode to prevent hitting API Requests-Per-Minute (RPM) limits
-        if (ocrMode === "ai_ocr" && i < list.length - 1) {
+        if (ocrMode === "ai_ocr" && i < list.length - 1 && !pageFallbackUsed) {
           updatePageProgress(
             pageNum,
             "success",
@@ -470,12 +486,21 @@ export default function PdfExtractor({
     pageNum: number,
     status: "pending" | "processing" | "success" | "failed",
     text?: string,
-    error?: string
+    error?: string,
+    isFallbackUsed?: boolean,
+    originalOcrError?: string
   ) => {
     setProgressList((prev) =>
       prev.map((item) =>
         item.pageNumber === pageNum
-          ? { ...item, status, extractedText: text, errorMessage: error }
+          ? {
+              ...item,
+              status,
+              extractedText: text,
+              errorMessage: error,
+              isFallbackUsed: isFallbackUsed !== undefined ? isFallbackUsed : item.isFallbackUsed,
+              originalOcrError: originalOcrError !== undefined ? originalOcrError : item.originalOcrError,
+            }
           : item
       )
     );
@@ -599,10 +624,10 @@ export default function PdfExtractor({
           </div>
 
           {/* Quick Config Shelf card */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
             {/* Mode selection */}
             <div className="space-y-2 text-right">
-              <label className="text-xs text-slate-500 font-bold font-nastaleeq block">1۔ ایکسٹریکشن موڈ (کیفیت)</label>
+              <label className="text-xs text-slate-500 font-bold font-nastaleeq block">1۔ ایکسٹریکشن موڈ</label>
               <div className="grid grid-cols-2 gap-1.5">
                 <button
                   type="button"
@@ -626,13 +651,53 @@ export default function PdfExtractor({
                 </button>
               </div>
               <p className="text-[9px] text-teal-800 font-medium bg-teal-50 px-2.5 py-0.5 rounded-md font-nastaleeq leading-tight mt-1 inline-block">
-                *جیمنی موڈ خراب پرنٹس اور اسکین شدہ اوراق کے لیے بہترین ہے۔
+                *جیمنی موڈ خراب پرنٹس اور اوراق کے لیے بہترین ہے۔
+              </p>
+            </div>
+
+            {/* AI Resolution / Speed Selector */}
+            <div className="space-y-2 text-right">
+              <label className="text-xs text-slate-500 font-bold font-nastaleeq block">2۔ پروسیسنگ رفتار و سائز</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  disabled={ocrMode !== "ai_ocr"}
+                  onClick={() => setOcrResolution("speed")}
+                  className={`py-2.5 rounded-xl text-xs font-nastaleeq font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    ocrMode !== "ai_ocr"
+                      ? "opacity-40 cursor-not-allowed bg-slate-50 text-slate-400"
+                      : ocrResolution === "speed"
+                      ? "bg-gradient-to-tr from-violet-700 to-violet-850 text-white shadow-md shadow-violet-100/40"
+                      : "bg-slate-50 text-slate-650 hover:bg-slate-100"
+                  }`}
+                >
+                  تیز رفتار موڈ (سفارش شدہ)
+                </button>
+                <button
+                  type="button"
+                  disabled={ocrMode !== "ai_ocr"}
+                  onClick={() => setOcrResolution("hq")}
+                  className={`py-2.5 rounded-xl text-xs font-nastaleeq font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    ocrMode !== "ai_ocr"
+                      ? "opacity-40 cursor-not-allowed bg-slate-50 text-slate-400"
+                      : ocrResolution === "hq"
+                      ? "bg-gradient-to-tr from-violet-700 to-violet-850 text-white shadow-md shadow-violet-100/40"
+                      : "bg-slate-50 text-slate-650 hover:bg-slate-100"
+                  }`}
+                >
+                  اعلیٰ معیار (HD)
+                </button>
+              </div>
+              <p className="text-[9px] text-slate-550 leading-tight font-nastaleeq">
+                {ocrResolution === "speed"
+                  ? "*ورسل ہوبی (Vercel) کے تیز رفتار پروسیسنگ اور ٹائم آؤٹ سے بچنے کے لیے۔"
+                  : "*پریمیم مستحکم کنکشن کے لیے؛ تفصیلی اور انتہائی دھندلی لکھائی زوم کرنے کے لیے۔"}
               </p>
             </div>
 
             {/* Range selection */}
             <div className="space-y-2 text-right">
-              <label className="text-xs text-slate-500 font-bold font-nastaleeq block">2۔ صفحات کا دائرہ (رینج)</label>
+              <label className="text-xs text-slate-500 font-bold font-nastaleeq block">3۔ صفحات کا دائرہ (رینج)</label>
               <div className="grid grid-cols-3 gap-1.5">
                 <button
                   type="button"
@@ -828,42 +893,85 @@ export default function PdfExtractor({
               </h4>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
-                {progressList.map((item) => (
-                  <div
-                    key={item.pageNumber}
-                    onClick={() => {
-                      if (!isProcessing) setCurrentPage(item.pageNumber);
-                    }}
-                    title={item.errorMessage ? `خرابی: ${item.errorMessage}` : `صفحہ ${item.pageNumber}`}
-                    className={`p-2.5 border rounded-xl text-center cursor-pointer transition flex flex-col items-center justify-center ${
-                      item.status === "success"
-                        ? "bg-emerald-50 border-emerald-250 text-emerald-800"
-                        : item.status === "processing"
-                        ? "bg-blue-50 border-blue-250 text-blue-800 animate-pulse"
-                        : item.status === "failed"
-                        ? "bg-rose-50 border-rose-250 text-rose-850 hover:bg-rose-100"
-                        : "bg-slate-50 border-slate-200 text-slate-505"
-                    }`}
-                  >
-                    <span className="text-[10px] font-bold font-nastaleeq">صفحہ {item.pageNumber}</span>
-                    <span className="text-[9px] font-mono font-medium block uppercase opacity-80 mt-0.5">
-                      {item.status === "success"
-                        ? "کامیابی"
-                        : item.status === "processing"
-                        ? "لوڈ ہو رہا..."
-                        : item.status === "failed"
-                        ? "ناکام"
-                        : "پینڈنگ"}
-                    </span>
-                  </div>
-                ))}
+                {progressList.map((item) => {
+                  const hasFallback = item.status === "success" && item.isFallbackUsed;
+                  let bgBg = "bg-slate-50 border-slate-200 text-slate-505";
+                  if (item.status === "success") {
+                    if (hasFallback) {
+                      bgBg = "bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100/50";
+                    } else {
+                      bgBg = "bg-emerald-50 border-emerald-250 text-emerald-800 hover:bg-emerald-100/50";
+                    }
+                  } else if (item.status === "processing") {
+                    bgBg = "bg-blue-50 border-blue-250 text-blue-800 animate-pulse";
+                  } else if (item.status === "failed") {
+                    bgBg = "bg-rose-50 border-rose-250 text-rose-850 hover:bg-rose-100";
+                  }
+
+                  return (
+                    <div
+                      key={item.pageNumber}
+                      onClick={() => {
+                        if (!isProcessing) setCurrentPage(item.pageNumber);
+                      }}
+                      title={
+                        item.isFallbackUsed
+                          ? `براہِ راست کمپیوٹر ریڈر کے ذریعے الفاظ متبادل پڑھے گئے۔ اصل او سی آر کی خرابی: ${item.originalOcrError || item.errorMessage}`
+                          : item.errorMessage
+                          ? `خرابی: ${item.errorMessage}`
+                          : `صفحہ ${item.pageNumber}`
+                      }
+                      className={`p-2.5 border rounded-xl text-center cursor-pointer transition flex flex-col items-center justify-center ${bgBg}`}
+                    >
+                      <span className="text-[10px] font-bold font-nastaleeq">صفحہ {item.pageNumber}</span>
+                      <span className="text-[9px] font-mono font-medium block uppercase opacity-85 mt-0.5">
+                        {item.status === "processing"
+                          ? "لوڈ ہو رہا..."
+                          : item.status === "failed"
+                          ? "ناکام"
+                          : item.status === "success"
+                          ? hasFallback
+                            ? "متبادل"
+                            : "او سی آر"
+                          : "پینڈنگ"}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
+
+              {/* Specific fallback pages error logs with explanation */}
+              {progressList.some((item) => item.status === "success" && item.isFallbackUsed) && (
+                <div className="mt-4 p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2 text-xs text-amber-900">
+                  <div className="font-bold font-nastaleeq flex items-center gap-1.5 text-amber-950">
+                    <AlertTriangle className="w-4.5 h-4.5 text-amber-600 shrink-0" />
+                    جیمنی او سی آر کے فیل ہونے کی وجوہات (Gemini API Issues):
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed font-nastaleeq">
+                    مندرجہ ذیل صفحات پر جیمنی او سی آر ناکام ہو گیا تھا، جس کی وجہ سے سسٹم نے فائل کے اندر سے براہِ راست متبادل الفاظ نکالے۔ چونکہ بہت سی پرانی پی ڈی ایف فائلوں کے اپنے اندر چھپے الفاظ الٹے اور خراب محفوظ ہوتے ہیں، اس لیے متبادل نکالنے سے لکھائی خراب آئی ہے۔ براہِ کرم خرابی دیکھ کر اسے حل کریں تاکہ مکمل جادوئی او سی آر کام کرے:
+                  </p>
+                  <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 font-nastaleeq" dir="rtl">
+                    {progressList
+                      .filter((item) => item.status === "success" && item.isFallbackUsed)
+                      .map((item) => (
+                        <div key={item.pageNumber} className="bg-white/80 p-2.5 rounded-lg border border-amber-205 font-mono text-right text-[11px] leading-relaxed flex flex-col sm:flex-row sm:items-center justify-start gap-1.5">
+                          <span className="font-nastaleeq font-bold text-amber-900 shrink-0 bg-amber-100 py-0.5 px-2 rounded-md">
+                            صفحہ {item.pageNumber}:
+                          </span>
+                          <span className="text-slate-800 font-sans font-medium text-left break-all">
+                            {item.originalOcrError || "جیمنی سرور غائب یا رد ہوا۔"}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
 
               {/* Specific failed pages error logs */}
               {progressList.some((item) => item.status === "failed") && (
                 <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-2 text-xs text-rose-850">
                   <div className="font-bold font-nastaleeq flex items-center gap-1.5 text-rose-900">
-                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <AlertTriangle className="w-4 text-rose-600 shrink-0" />
                     ناکام صفحات کی خرابیاں (Page Errors):
                   </div>
                   <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1" dir="rtl">

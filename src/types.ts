@@ -26,4 +26,6 @@ export interface OcrPageProgress {
   status: "pending" | "processing" | "success" | "failed";
   extractedText?: string;
   errorMessage?: string;
+  isFallbackUsed?: boolean;
+  originalOcrError?: string;
 }

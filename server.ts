@@ -73,7 +73,7 @@ async function generateContentWithRetryAndFallback(params: {
   const primary = params.primaryModel || "gemini-3.5-flash";
   
   // High-availability alternate fallback models
-  const modelsToTry = [primary, "gemini-3.1-flash-lite", "gemini-flash-latest"];
+  const modelsToTry = [primary, "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-flash-latest"];
   
   let lastError: any = null;
   
@@ -214,7 +214,11 @@ app.post("/api/ocr-page", async (req, res) => {
     const response = await generateContentWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: { parts: [imagePart, { text: prompt }] },
-      config: {}, // Allow default model reasoning to map layout structure and transcribe every word without skipping
+      config: {
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.MINIMAL, // Set minimal thinking to ensure instant visual OCR and prevent Vercel timeouts!
+        },
+      },
     });
 
     const resultText = response.text || "";
