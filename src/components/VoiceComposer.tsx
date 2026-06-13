@@ -334,13 +334,68 @@ export default function VoiceComposer({
         }),
       });
 
-      const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "ریفائننگ عمل میں کوئی تعطل آیا ہے۔");
+        const textResponse = await response.text();
+        let errText = "ریفائننگ عمل میں کوئی تعطل آیا ہے۔";
+        try {
+          const data = JSON.parse(textResponse);
+          errText = data.error || errText;
+        } catch (_) {
+          errText = textResponse.replace(/<[^>]*>/g, " ").substring(0, 300);
+        }
+        throw new Error(errText);
       }
 
-      if (data.text) {
-        onUpdateDraftContent(data.text);
+      // High-performance live stream reader
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let accumulatedText = "";
+
+      if (!reader) {
+        throw new Error("ریسپانس اسٹریم دستیاب نہیں ہے۔");
+      }
+
+      let buffer = "";
+      let done = false;
+
+      while (!done) {
+        const { value, done: isDone } = await reader.read();
+        done = isDone;
+
+        if (value) {
+          buffer += decoder.decode(value, { stream: !done });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const cleanedLine = line.trim();
+            if (!cleanedLine) continue;
+
+            if (cleanedLine.startsWith("data: ")) {
+              const dataContent = cleanedLine.slice(6).trim();
+              if (dataContent === "[DONE]") {
+                done = true;
+                break;
+              }
+
+              try {
+                const parsed = JSON.parse(dataContent);
+                if (parsed.error) {
+                  throw new Error(parsed.error);
+                }
+                if (parsed.text) {
+                  accumulatedText += parsed.text;
+                  onUpdateDraftContent(accumulatedText);
+                }
+              } catch (parseErr: any) {
+                if (parseErr.message && !parseErr.message.includes("JSON")) {
+                  throw parseErr;
+                }
+                console.error("Packet parse error:", line, parseErr);
+              }
+            }
+          }
+        }
       }
     } catch (error: any) {
       console.warn("[refine-text failure info]", error);

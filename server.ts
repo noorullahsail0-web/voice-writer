@@ -171,6 +171,111 @@ async function generateContentWithRetryAndFallback(params: {
   throw lastError || new Error("مطلوبہ ماڈل پر ابھی رش زیادہ ہے، براہ کرم تھوڑی دیر بعد دوبارہ کوشش کریں۔");
 }
 
+/**
+ * Safe wrapper around generateContentStream that adds retries and model fallback
+ * to support immediate chunked response flushing (ideal for serverless timeout mitigation).
+ */
+async function generateContentStreamWithRetryAndFallback(params: {
+  contents: any;
+  config?: any;
+  primaryModel?: string;
+}) {
+  const ai = getGeminiClient();
+  const isVercel = !!process.env.VERCEL;
+  const primary = params.primaryModel || "gemini-3.5-flash";
+  
+  // High-availability alternate fallback models
+  const modelsToTry = [primary, "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-flash-latest"];
+  
+  let lastError: any = null;
+  
+  for (const model of modelsToTry) {
+    let retries = 2; 
+    let delay = isVercel ? 500 : 1000; 
+    
+    while (retries > 0) {
+      try {
+        console.log(`[Gemini API Stream] Requesting stream from ${model} (Attempts remaining for this model: ${retries})...`);
+        
+        // Safely adjust config if model is not a Gemini 3.5 thinking model
+        let modelConfig = params.config ? { ...params.config } : {};
+        if (!model.startsWith("gemini-3.5") && modelConfig.thinkingConfig) {
+          delete modelConfig.thinkingConfig;
+        }
+        
+        const responseStream = await ai.models.generateContentStream({
+          model: model,
+          contents: params.contents,
+          config: modelConfig,
+        });
+        
+        console.log(`[Gemini API Stream] Successfully opened stream from ${model}`);
+        return responseStream;
+      } catch (error: any) {
+        lastError = error;
+        const errMsg = String(error.message || "").toLowerCase();
+        let errJson = errMsg;
+        try {
+          errJson = JSON.stringify({
+            message: error.message,
+            status: error.status,
+            code: error.code,
+            details: error.details,
+          });
+        } catch (_) {}
+        errJson = errJson.toLowerCase();
+        
+        const isQuotaExceeded =
+          errMsg.includes("429") ||
+          errMsg.includes("limit") ||
+          errMsg.includes("quota") ||
+          errMsg.includes("exhausted") ||
+          errJson.includes("429") ||
+          errJson.includes("limit") ||
+          errJson.includes("quota") ||
+          errJson.includes("exhausted") ||
+          error.status === 429 ||
+          error.code === 429;
+
+        if (isQuotaExceeded) {
+          console.log(`[Status] Model ${model} is currently busy/rate-limited. Seamlessly transitioning to fallback on stream...`);
+          break;
+        }
+        
+        const isTransientServerSpike = 
+          errMsg.includes("503") || 
+          errMsg.includes("unavailable") || 
+          errMsg.includes("high demand") || 
+          errMsg.includes("overloaded") ||
+          errMsg.includes("temp") ||
+          errMsg.includes("spike") ||
+          errJson.includes("503") || 
+          errJson.includes("unavailable") || 
+          errJson.includes("high demand") || 
+          errJson.includes("overloaded") ||
+          errJson.includes("temp") ||
+          errJson.includes("spike") ||
+          error.status === 503 ||
+          error.code === 503;
+          
+        if (!isTransientServerSpike) {
+          console.log(`[Status] Model ${model} stream returned handled message. Moving to alternate model.`);
+          break;
+        }
+        
+        retries--;
+        if (retries > 0 && delay > 0) {
+          console.log(`[Status] Model ${model} stream returned a temporary busy state. Retrying in ${delay}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          delay *= 1.5;
+        }
+      }
+    }
+  }
+  
+  throw lastError || new Error("مطلوبہ ماڈل پر ابھی رش زیادہ ہے، اور اسٹریم شروع نہیں کی جا سکی۔");
+}
+
 // REST API routes must be declared FIRST
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
@@ -178,8 +283,7 @@ app.get("/api/health", (req, res) => {
 
 /**
  * High-fidelity OCR page extraction endpoint.
- * Takes a base64 encoded image of a scanned/damaged PDF page
- * and extracts clean Urdu, Arabic or English text.
+ * Streams real-time tokens to the client to keep connections active and prevent timeouts.
  */
 app.post("/api/ocr-page", async (req, res) => {
   try {
@@ -188,7 +292,6 @@ app.post("/api/ocr-page", async (req, res) => {
       return res.status(400).json({ error: "براہ کرم صفحہ کی تصویر فراہم کریں۔" });
     }
 
-    const ai = getGeminiClient();
     const cleanMime = mimeType || "image/png";
 
     const prompt = 
@@ -209,9 +312,8 @@ app.post("/api/ocr-page", async (req, res) => {
       },
     };
 
-    const isVercel = !!process.env.VERCEL;
-
-    const response = await generateContentWithRetryAndFallback({
+    console.log("[OCR Request] Opening Gemini OCR Stream...");
+    const responseStream = await generateContentStreamWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: { parts: [imagePart, { text: prompt }] },
       config: {
@@ -221,16 +323,36 @@ app.post("/api/ocr-page", async (req, res) => {
       },
     });
 
-    const resultText = response.text || "";
-    res.json({ text: resultText });
+    // Send headers for Event Stream chunked transfer (prevents Vercel 10s timeout instantly)
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    (res as any).flushHeaders?.();
+
+    for await (const chunk of responseStream) {
+      const chunkText = chunk.text || "";
+      if (chunkText) {
+        res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
+        (res as any).flush?.();
+      }
+    }
+
+    res.write("data: [DONE]\n\n");
+    res.end();
   } catch (error: any) {
     console.error("OCR API error:", error);
-    res.status(500).json({ error: error.message || "او سی آر کے دوران خرابی پیش آئی۔" });
+    if (res.headersSent) {
+      res.write(`data: ${JSON.stringify({ error: error.message || "او سی آر کے دوران خرابی پیش آئی۔" })}\n\n`);
+      res.end();
+    } else {
+      res.status(500).json({ error: error.message || "او سی آر کے دوران خرابی پیش آئی۔" });
+    }
   }
 });
 
 /**
  * Text refiner (spelling correction, diacritics insertion, translation, summarization)
+ * Uses high-fidelity streaming block for absolute stability on Vercel deployments.
  */
 app.post("/api/refine-text", async (req, res) => {
   try {
@@ -239,7 +361,6 @@ app.post("/api/refine-text", async (req, res) => {
       return res.status(400).json({ error: "براہ کرم ترمیم کرنے کے لئے عبارت فراہم کریں۔" });
     }
 
-    const ai = getGeminiClient();
     let prompt = "";
 
     switch (mode) {
@@ -269,16 +390,36 @@ app.post("/api/refine-text", async (req, res) => {
         prompt = "Review and polish the following text, improving readability and typesetting. return only the polished text:";
     }
 
-    const response = await generateContentWithRetryAndFallback({
+    console.log(`[Refinement Request] Opening Text Refinement Stream for mode: ${mode}...`);
+    const responseStream = await generateContentStreamWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: [prompt, text],
-      config: {}, // Allow default reasoning capabilities to proofread with high accuracy
+      config: {}, // Allow reasoning to resolve typographic structures
     });
 
-    res.json({ text: response.text || "" });
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    (res as any).flushHeaders?.();
+
+    for await (const chunk of responseStream) {
+      const chunkText = chunk.text || "";
+      if (chunkText) {
+        res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
+        (res as any).flush?.();
+      }
+    }
+
+    res.write("data: [DONE]\n\n");
+    res.end();
   } catch (error: any) {
     console.error("Refining API error:", error);
-    res.status(500).json({ error: error.message || "ترمیم کے دوران خرابی پیش آئی۔" });
+    if (res.headersSent) {
+      res.write(`data: ${JSON.stringify({ error: error.message || "ترمیم کے دوران خرابی پیش آئی۔" })}\n\n`);
+      res.end();
+    } else {
+      res.status(500).json({ error: error.message || "ترمیم کے دوران خرابی پیش آئی۔" });
+    }
   }
 });
 

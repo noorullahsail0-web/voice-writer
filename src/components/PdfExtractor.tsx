@@ -360,21 +360,77 @@ export default function PdfExtractor({
               body: JSON.stringify({ image: base64, mimeType }),
             });
 
-            const contentType = response.headers.get("content-type") || "";
-            let data: any = {};
-            if (contentType.includes("application/json")) {
-              data = await response.json();
-            } else {
-              const textResponse = await response.text();
-              const plainText = textResponse.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().substring(0, 300);
-              data = { error: plainText || `سرور کی طرف سے غیر متوقع جواب ملا (Status: ${response.status})` };
-            }
-
             if (!response.ok) {
-              throw new Error(data.error || "سرور او سی آر رد ہوا۔");
+              const textResponse = await response.text();
+              let errText = "سرور او سی آر رد ہوا۔";
+              try {
+                const data = JSON.parse(textResponse);
+                errText = data.error || errText;
+              } catch (_) {
+                errText = textResponse.replace(/<[^>]*>/g, " ").substring(0, 300);
+              }
+              throw new Error(errText);
             }
 
-            cleanPageText = data.text || "";
+            // High-performance Server-Sent-Events stream decoder
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let accumulatedText = "";
+
+            if (!reader) {
+              throw new Error("ریسپانس اسٹریم دستیاب نہیں ہے۔");
+            }
+
+            let buffer = "";
+            let done = false;
+
+            while (!done) {
+              const { value, done: isDone } = await reader.read();
+              done = isDone;
+
+              if (value) {
+                buffer += decoder.decode(value, { stream: !done });
+                const lines = buffer.split("\n\n");
+                buffer = lines.pop() || "";
+
+                for (const line of lines) {
+                  const cleanedLine = line.trim();
+                  if (!cleanedLine) continue;
+
+                  if (cleanedLine.startsWith("data: ")) {
+                    const dataContent = cleanedLine.slice(6).trim();
+                    if (dataContent === "[DONE]") {
+                      done = true;
+                      break;
+                    }
+
+                    try {
+                      const parsed = JSON.parse(dataContent);
+                      if (parsed.error) {
+                        throw new Error(parsed.error);
+                      }
+                      if (parsed.text) {
+                        accumulatedText += parsed.text;
+                        // Provide real-time typing feedback in the Progress monitoring stack
+                        updatePageProgress(
+                          pageNum,
+                          "processing",
+                          accumulatedText,
+                          "تحریر لائیو کمپوز ہو رہی ہے..."
+                        );
+                      }
+                    } catch (parseErr: any) {
+                      if (parseErr.message && !parseErr.message.includes("JSON")) {
+                        throw parseErr;
+                      }
+                      console.error("Packet parse error:", line, parseErr);
+                    }
+                  }
+                }
+              }
+            }
+
+            cleanPageText = accumulatedText;
             isSuccess = true;
           } else {
             // Direct digital Text extraction from pdf page metadata
