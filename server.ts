@@ -337,7 +337,7 @@ app.post("/api/ocr-page", async (req, res) => {
 
     console.log("[OCR Request] Opening Gemini OCR Stream...");
     const responseStream = await generateContentStreamWithRetryAndFallback({
-      primaryModel: "gemini-2.5-flash",
+      primaryModel: "gemini-3.5-flash",
       contents: { parts: [imagePart, { text: prompt }] },
       config: {},
     });

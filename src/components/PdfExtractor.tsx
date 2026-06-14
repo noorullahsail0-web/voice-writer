@@ -43,8 +43,11 @@ const convertUrduToEnglishDigits = (input: string): string => {
 const configurePdfWorker = () => {
   if (!pdfjsLib || !pdfjsLib.GlobalWorkerOptions) return;
 
+  // Set the guaranteed relative public workerSrc path to ensure PDF.js has a secure fallback!
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+
   try {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && typeof Worker !== "undefined") {
       const blob = new Blob([workerSourceText], { type: "text/javascript" });
       const blobUrl = URL.createObjectURL(blob);
       const worker = new Worker(blobUrl, { type: "module" });
@@ -52,9 +55,9 @@ const configurePdfWorker = () => {
       console.log("[PDF Worker] Pre-configured GlobalWorkerOptions with Native Blob Module Worker successfully!");
     }
   } catch (err) {
-    console.error("[PDF Worker] Error configuring native same-thread worker fallback, trying classic Worker:", err);
+    console.warn("[PDF Worker] Error configuring native same-thread worker fallback, trying classic Worker:", err);
     try {
-      if (typeof window !== "undefined") {
+      if (typeof window !== "undefined" && typeof Worker !== "undefined") {
         const blob = new Blob([workerSourceText], { type: "text/javascript" });
         const blobUrl = URL.createObjectURL(blob);
         const worker = new Worker(blobUrl);
@@ -62,7 +65,7 @@ const configurePdfWorker = () => {
         console.log("[PDF Worker] Pre-configured GlobalWorkerOptions with Native Blob Classic Worker successfully!");
       }
     } catch (fallbackErr) {
-      console.error("[PDF Worker] Native classic worker fallback failed too:", fallbackErr);
+      console.warn("[PDF Worker] Native classic worker fallback failed too, utilizing workerSrc URL.", fallbackErr);
     }
   }
 };
