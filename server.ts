@@ -312,18 +312,7 @@ app.post("/api/ocr-page", async (req, res) => {
       },
     };
 
-    console.log("[OCR Request] Opening Gemini OCR Stream...");
-    const responseStream = await generateContentStreamWithRetryAndFallback({
-      primaryModel: "gemini-3.5-flash",
-      contents: { parts: [imagePart, { text: prompt }] },
-      config: {
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.MINIMAL,
-        },
-      },
-    });
-
-    // Send headers for Event Stream chunked transfer (prevents Vercel 10s timeout instantly)
+    // Send headers for Event Stream chunked transfer immediately (prevents Vercel 10s timeout instantly)
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
@@ -333,6 +322,13 @@ app.post("/api/ocr-page", async (req, res) => {
     // Pulse warming keep-alive packet to prevent cold start gateway serverless disconnects
     res.write(`data: ${JSON.stringify({ status: "warming" })}\n\n`);
     (res as any).flush?.();
+
+    console.log("[OCR Request] Opening Gemini OCR Stream...");
+    const responseStream = await generateContentStreamWithRetryAndFallback({
+      primaryModel: "gemini-2.5-flash",
+      contents: { parts: [imagePart, { text: prompt }] },
+      config: {},
+    });
 
     for await (const chunk of responseStream) {
       const chunkText = chunk.text || "";
@@ -395,6 +391,17 @@ app.post("/api/refine-text", async (req, res) => {
         prompt = "Review and polish the following text, improving readability and typesetting. return only the polished text:";
     }
 
+    // Send headers for Event Stream chunked transfer immediately (prevents Vercel 10s timeout instantly)
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no"); // Prevent Vercel network buffering on proxy layer
+    (res as any).flushHeaders?.();
+
+    // Pulse warming keep-alive packet to prevent cold start gateway serverless disconnects
+    res.write(`data: ${JSON.stringify({ status: "warming" })}\n\n`);
+    (res as any).flush?.();
+
     console.log(`[Refinement Request] Opening Text Refinement Stream for mode: ${mode}...`);
     const responseStream = await generateContentStreamWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
@@ -405,16 +412,6 @@ app.post("/api/refine-text", async (req, res) => {
         },
       },
     });
-
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache, no-transform");
-    res.setHeader("Connection", "keep-alive");
-    res.setHeader("X-Accel-Buffering", "no"); // Prevent Vercel network buffering on proxy layer
-    (res as any).flushHeaders?.();
-
-    // Pulse warming keep-alive packet to prevent cold start gateway serverless disconnects
-    res.write(`data: ${JSON.stringify({ status: "warming" })}\n\n`);
-    (res as any).flush?.();
 
     for await (const chunk of responseStream) {
       const chunkText = chunk.text || "";
