@@ -989,7 +989,7 @@ export default function PdfExtractor({
               <div className="bg-slate-50 border-b border-slate-150 p-3.5 text-slate-750 text-xs font-bold font-nastaleeq flex items-center justify-between">
                 <span>حاصل شدہ سادہ کمپوزر تحریر</span>
                 <span className="text-xs text-slate-450 font-mono">
-                  {activeDraft.content.length} اسکیپڈ حروف
+                  {activeDraft.content.length} کل حروف
                 </span>
               </div>
 
