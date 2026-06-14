@@ -6,7 +6,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -316,11 +316,7 @@ app.post("/api/ocr-page", async (req, res) => {
     const responseStream = await generateContentStreamWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: { parts: [imagePart, { text: prompt }] },
-      config: {
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.MINIMAL, // Set minimal thinking to ensure instant visual OCR and prevent Vercel timeouts!
-        },
-      },
+      config: {},
     });
 
     // Send headers for Event Stream chunked transfer (prevents Vercel 10s timeout instantly)
