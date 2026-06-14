@@ -6,7 +6,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -316,7 +316,11 @@ app.post("/api/ocr-page", async (req, res) => {
     const responseStream = await generateContentStreamWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: { parts: [imagePart, { text: prompt }] },
-      config: {},
+      config: {
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.MINIMAL,
+        },
+      },
     });
 
     // Send headers for Event Stream chunked transfer (prevents Vercel 10s timeout instantly)
@@ -395,7 +399,11 @@ app.post("/api/refine-text", async (req, res) => {
     const responseStream = await generateContentStreamWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: [prompt, text],
-      config: {}, // Allow reasoning to resolve typographic structures
+      config: {
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.LOW,
+        },
+      },
     });
 
     res.setHeader("Content-Type", "text/event-stream");
@@ -482,7 +490,11 @@ app.post("/api/transcribe-audio", async (req, res) => {
     const response = await generateContentWithRetryAndFallback({
       primaryModel: "gemini-3.5-flash",
       contents: { parts: [audioPart, { text: prompt }] },
-      config: {}, // Enable full reasoning capabilities to hear every word and syllables accurately
+      config: {
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.LOW,
+        },
+      },
     });
 
     res.json({ text: response.text || "" });
