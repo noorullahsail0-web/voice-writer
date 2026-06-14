@@ -268,8 +268,8 @@ export default function PdfExtractor({
     
     // Dynamically calculate scale based on the speed (low-latency Vercel friendly) or HD settings
     const isSpeed = ocrResolution === "speed";
-    const maxDimension = isSpeed ? 1300 : 2000;
-    const baseScale = isSpeed ? 1.4 : 2.2;
+    const maxDimension = isSpeed ? 1200 : 1600;
+    const baseScale = isSpeed ? 1.3 : 1.8;
     
     const currentMax = Math.max(rawViewport.width, rawViewport.height);
     const scale = currentMax > maxDimension ? maxDimension / currentMax : baseScale;
@@ -280,8 +280,8 @@ export default function PdfExtractor({
 
     await page.render({ canvasContext: context, viewport: viewport }).promise;
 
-    // Use tighter compression on speed mode (0.8) to dramatically reduce transmission payload sizes
-    const dataUrl = canvas.toDataURL("image/jpeg", isSpeed ? 0.8 : 0.88);
+    // Use tighter compression (0.72 for speed, 0.78 for hq) to dramatically reduce transmission payload sizes
+    const dataUrl = canvas.toDataURL("image/jpeg", isSpeed ? 0.72 : 0.78);
     const base64 = dataUrl.split(",")[1];
     return { base64, mimeType: "image/jpeg" };
   };
