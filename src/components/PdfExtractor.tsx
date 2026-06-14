@@ -371,11 +371,16 @@ export default function PdfExtractor({
             if (!response.ok) {
               const textResponse = await response.text();
               let errText = "سرور او سی آر رد ہوا۔";
-              try {
-                const data = JSON.parse(textResponse);
-                errText = data.error || errText;
-              } catch (_) {
-                errText = textResponse.replace(/<[^>]*>/g, " ").substring(0, 300);
+              
+              if (response.status === 504 || response.status === 502) {
+                errText = "ورسل کا ٹائم آؤٹ (Vercel 504/502 Timeout)۔ چونکہ ورسل کا مفت اکاؤنٹ 10 سیکنڈز کے بعد لائیو اسٹریم بند کر دیتا ہے، اس لئے براہ کرم گوگل کلاؤڈ رن (Google Cloud Run) والا آفیشل شیئر لنک استعمال کریں۔";
+              } else {
+                try {
+                  const data = JSON.parse(textResponse);
+                  errText = data.error || errText;
+                } catch (_) {
+                  errText = textResponse.replace(/<[^>]*>/g, " ").substring(0, 300);
+                }
               }
               throw new Error(errText);
             }
