@@ -327,7 +327,12 @@ app.post("/api/ocr-page", async (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no"); // Prevent Vercel network buffering on proxy layer
     (res as any).flushHeaders?.();
+
+    // Pulse warming keep-alive packet to prevent cold start gateway serverless disconnects
+    res.write(`data: ${JSON.stringify({ status: "warming" })}\n\n`);
+    (res as any).flush?.();
 
     for await (const chunk of responseStream) {
       const chunkText = chunk.text || "";
@@ -400,7 +405,12 @@ app.post("/api/refine-text", async (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no"); // Prevent Vercel network buffering on proxy layer
     (res as any).flushHeaders?.();
+
+    // Pulse warming keep-alive packet to prevent cold start gateway serverless disconnects
+    res.write(`data: ${JSON.stringify({ status: "warming" })}\n\n`);
+    (res as any).flush?.();
 
     for await (const chunk of responseStream) {
       const chunkText = chunk.text || "";
