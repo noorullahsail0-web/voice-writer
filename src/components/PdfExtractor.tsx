@@ -264,15 +264,15 @@ export default function PdfExtractor({
 
     // Dynamically calculate scale to deliver razor-sharp, high-definition images
     // to preserve every single Urdu/Arabic nuqta and micro-diacritic for flawless Gemini OCR.
-    // We target an incredibly detailed maximum dimension of 2000px, and a premium base scale of 2.2
-    // to ensure text is perfectly legible while keeping payload sizes highly optimized (~200kb - 400kb).
-    // This perfectly retains character details while avoiding any connection timeouts.
+    // We target optimized dimensions (max 1000px on speed, 1350px on hq) and premium scale factors
+    // to make sure canvas memory stays lightweight and never crashes or hangs WebViews on mobile devices,
+    // while keeping legibility for Gemini vision models at 100%.
     const rawViewport = page.getViewport({ scale: 1.0 });
     
     // Dynamically calculate scale based on the speed (low-latency Vercel friendly) or HD settings
     const isSpeed = ocrResolution === "speed";
-    const maxDimension = isSpeed ? 1200 : 1600;
-    const baseScale = isSpeed ? 1.3 : 1.8;
+    const maxDimension = isSpeed ? 1000 : 1350;
+    const baseScale = isSpeed ? 1.15 : 1.45;
     
     const currentMax = Math.max(rawViewport.width, rawViewport.height);
     const scale = currentMax > maxDimension ? maxDimension / currentMax : baseScale;
@@ -281,7 +281,12 @@ export default function PdfExtractor({
     canvas.height = viewport.height;
     canvas.width = viewport.width;
 
-    await page.render({ canvasContext: context, viewport: viewport }).promise;
+    // Safe render promise with a 15-second timeout to prevent background Webview rendering hangs on mobile devices
+    const renderPromise = page.render({ canvasContext: context, viewport: viewport }).promise;
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("پیج رینڈرنگ کا وقت ختم ہو گیا (Render Timeout)۔")), 15000)
+    );
+    await Promise.race([renderPromise, timeoutPromise]);
 
     // Use tighter compression (0.72 for speed, 0.78 for hq) to dramatically reduce transmission payload sizes
     const dataUrl = canvas.toDataURL("image/jpeg", isSpeed ? 0.72 : 0.78);
@@ -535,6 +540,8 @@ export default function PdfExtractor({
         }
       } else {
         updatePageProgress(pageNum, "failed", undefined, lastErrMessage);
+        // Show the failure message prominently at the top level alert so that the user doesn't miss it on mobile screens!
+        setErrorMessage(`صفحہ ${pageNum} تبدیل کرنے میں ناکامی: ${lastErrMessage}`);
       }
     }
 
