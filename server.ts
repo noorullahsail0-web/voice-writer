@@ -28,9 +28,21 @@ if (typeof (Promise as any).try !== 'function') {
 const app = express();
 const PORT = 3000;
 
-// Increase request limit for base64 files
-app.use(express.json({ limit: "100mb" }));
-app.use(express.urlencoded({ limit: "100mb", extended: true }));
+// Increase request limit for base64 files with safe serverless bypass if pre-parsed by Vercel
+app.use((req, res, next) => {
+  if (req.body !== undefined) {
+    next();
+  } else {
+    express.json({ limit: "100mb" })(req, res, next);
+  }
+});
+app.use((req, res, next) => {
+  if (req.body !== undefined) {
+    next();
+  } else {
+    express.urlencoded({ limit: "100mb", extended: true })(req, res, next);
+  }
+});
 
 // Lazy initializer for Gemini client to prevent crash on startup if key is missing
 let aiClient: GoogleGenAI | null = null;
