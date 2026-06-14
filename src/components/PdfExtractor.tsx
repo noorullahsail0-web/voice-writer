@@ -455,6 +455,23 @@ export default function PdfExtractor({
           console.error(`Page ${pageNum} attempt ${attempt} failed:`, err);
           lastErrMessage = err.message || "پروسیسنگ فیل۔";
           
+          const errMsgLower = lastErrMessage.toLowerCase();
+          const isFatal =
+            lastErrMessage.includes("کی (GEMINI_API_KEY) غائب") ||
+            errMsgLower.includes("gemini_api_key") ||
+            errMsgLower.includes("api key") ||
+            errMsgLower.includes("unauthorized") ||
+            errMsgLower.includes("401") ||
+            errMsgLower.includes("api_key") ||
+            errMsgLower.includes("not found") ||
+            errMsgLower.includes("api key expired");
+
+          if (isFatal) {
+            console.log(`Page ${pageNum} encountered a fatal/configuration error. Aborting further page attempts.`);
+            isAbortedRef.current = true;
+            break; // Break the attempt loop immediately
+          }
+          
           if (attempt < maxAttempts) {
             // Update Page progress with retry notice for instant feedback
             updatePageProgress(
@@ -470,7 +487,11 @@ export default function PdfExtractor({
         }
       }
 
-      if (isAbortedRef.current) break;
+      if (isAbortedRef.current) {
+        updatePageProgress(pageNum, "failed", undefined, lastErrMessage);
+        setErrorMessage(lastErrMessage);
+        break;
+      }
 
       // Smart Fallback: If AI OCR failed (e.g. quota limit reached), attempt to read digital text directly as fallback
       if (!isSuccess && ocrMode === "ai_ocr") {
@@ -859,6 +880,35 @@ export default function PdfExtractor({
             </div>
           </div>
 
+          {/* Quick Alert advisory banner */}
+          {errorMessage && (
+            <div className="bg-rose-50 border border-slate-200 text-rose-900 p-5 rounded-3xl text-xs space-y-2.5 leading-relaxed text-right font-nastaleeq shadow-sm border-r-4 border-r-rose-600 shadow-rose-100/30" dir="rtl">
+              <div className="font-bold flex items-center justify-start gap-2 text-rose-950 font-nastaleeq text-sm">
+                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 animate-bounce" />
+                <span>تبدیل کاری کے دوران سسٹم کی اہم خرابی:</span>
+              </div>
+              <p className="text-[12px] text-rose-800 leading-relaxed font-sans font-medium">
+                {errorMessage}
+              </p>
+              {(errorMessage.includes("GEMINI_API_KEY") || errorMessage.toLowerCase().includes("api") || errorMessage.includes("جیمنی کی") || errorMessage.toLowerCase().includes("key")) && (
+                <div className="mt-3 bg-white/90 p-4 rounded-xl border border-rose-100 text-[11.5px] text-slate-750 font-nastaleeq">
+                  <p className="font-bold text-rose-900 mb-2 border-b pb-1">💡 ورسل (Vercel) پر جیمنی اے پی آئی کی کو دوبارہ داخل کرنے کا آسان طریقہ:</p>
+                  <p className="text-[11px] text-slate-500 mb-2 leading-relaxed">
+                    چونکہ آپ نے ورسل سے پروجیکٹ ڈیلیٹ کر کے بالکل نیا پروجیکٹ ڈپلائے کیا ہے، اس لیے پرانے پروجیکٹ کے محفوظ کردہ سیٹنگز اور کی (Environment Variables) ضائع ہو گئی ہیں۔ اسے دوبارہ چالو کرنے کے لیے مندرجہ ذیل اقدام کریں:
+                  </p>
+                  <ol className="list-decimal space-y-1.5 pr-4 text-right leading-loose font-sans font-medium" dir="rtl">
+                    <li>اپنے <a href="https://vercel.com" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold">Vercel Dashboard</a> پر جائیے اور اپنے ایپ کا پروجیکٹ کھولیں۔</li>
+                    <li>اوپر موجود مینو میں سے <strong className="text-slate-900">Settings</strong> اور پھر بائیں مینو میں <strong className="text-slate-900">Environment Variables</strong> کے آپشن پر کلک کریں۔</li>
+                    <li>ویری ایبل کے نام (Key) میں <strong className="text-rose-600 font-mono">GEMINI_API_KEY</strong> درج کریں۔</li>
+                    <li>ویری ایبل کی قیمت (Value) والے خانے میں اپنی جیمنی اے پی آئی کی (جو کہ <code className="bg-slate-100 py-0.5 px-1 mr-1 rounded font-mono text-xs">AIzaSy...</code> سے شروع ہوتی ہے) ڈالیں۔</li>
+                    <li>نیچے موجود نیلے رنگ کے بٹن <strong className="text-indigo-600 font-sans">Save / Add</strong> پر کلک کر دیں۔</li>
+                    <li>اب اوپر موجود مینو میں سے <strong className="text-slate-900">Deployments</strong> پر کلک کریں۔ اپنے آخری ڈپلائمنٹ (بلڈ) کے برابر میں دائیں طرف تین نقطوں <strong className="text-slate-900">(...)</strong> پر کلک کر کے <strong className="text-emerald-700">Redeploy</strong> پر کلک کریں تاکہ نئے بلڈ میں یہ کی لاگو ہو جائے اور جادوئی تحریر بالکل ٹھیک کام کرنے لگ جائے!</li>
+                  </ol>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Fallback warning box with explanation */}
           {hasFallbackUsed && (
             <div className="bg-amber-50 border border-amber-300 text-amber-955 p-5 rounded-3xl text-xs space-y-2.5 leading-relaxed text-right font-nastaleeq" dir="rtl">
@@ -1111,15 +1161,6 @@ export default function PdfExtractor({
               </button>
             </div>
           )}
-
-          {/* Quick Alert advisory banner */}
-          {errorMessage && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-xl text-xs font-bold font-nastaleeq text-right flex items-center justify-start gap-2 animate-pulse">
-              <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
         </div>
       )}
     </div>
