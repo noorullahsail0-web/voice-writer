@@ -72,6 +72,8 @@ export default function VoiceComposer({
         return "ar-SA";
       case "en":
         return "en-US";
+      case "ur_ar":
+        return "ur-PK";
       default:
         return "ur-PK";
     }
@@ -290,6 +292,7 @@ export default function VoiceComposer({
         body: JSON.stringify({
           audio: base64data,
           mimeType: mimeTypeToUse,
+          language: language,
         }),
       });
 
@@ -487,7 +490,7 @@ export default function VoiceComposer({
           <span className="text-xs text-slate-600 font-bold">
             رسم الخط:{" "}
             <strong className="text-teal-700">
-              {language === "ur" ? "اردو نستعلیق" : language === "ar" ? "عربی نسخ" : "انگریزی رومن"}
+              {language === "ur" ? "اردو نستعلیق" : language === "ar" ? "عربی نسخ" : language === "ur_ar" ? "اردو + عربی مکس" : "انگریزی رومن"}
             </strong>
           </span>
         </div>
@@ -505,7 +508,7 @@ export default function VoiceComposer({
               <Languages className="w-4 h-4 text-teal-600" />
               1۔ زبان منتخب کریں:
             </h4>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => handleLanguageChange("ur")}
                 className={`py-3 rounded-xl font-nastaleeq text-xs font-bold transition cursor-pointer flex flex-col items-center gap-1.5 ${
@@ -531,6 +534,18 @@ export default function VoiceComposer({
               </button>
 
               <button
+                onClick={() => handleLanguageChange("ur_ar")}
+                className={`py-3 rounded-xl font-nastaleeq text-xs font-bold transition cursor-pointer flex flex-col items-center gap-1 text-center ${
+                  language === "ur_ar"
+                    ? "bg-gradient-to-tr from-teal-700 to-teal-850 text-white shadow-md shadow-teal-100/40"
+                    : "bg-slate-50 text-slate-650 hover:bg-slate-100"
+                }`}
+              >
+                <span className="text-sm font-bold text-center">عربی+اردو مکس</span>
+                <span className="text-[9px] opacity-75 leading-none">(Mixed AI)</span>
+              </button>
+
+              <button
                 onClick={() => handleLanguageChange("en")}
                 className={`py-3 rounded-xl font-sans text-xs font-bold transition cursor-pointer flex flex-col items-center gap-1.5 ${
                   language === "en"
@@ -552,6 +567,11 @@ export default function VoiceComposer({
 
             {/* Mode A: Realtime continuous Web Speech */}
             <div className="space-y-2.5">
+              {language === "ur_ar" && (
+                <div className="bg-amber-50 border border-amber-200/50 p-2.5 rounded-xl text-[11px] text-amber-800 leading-relaxed font-nastaleeq mb-1">
+                  💡 <strong>رہنمائی:</strong> مکس اردو اور عربی بولنے کے لیے نیچے موجود <strong>"اعلیٰ کوالٹی صوتی ٹائپنگ (جیمنی AI)"</strong> والا آپشن استعمال کریں۔ براؤزر کی یہ لائیو ٹائپنگ بیک وقت دو بالکل الگ رسم الخط پہچاننے میں محدود ہوتی ہے۔
+                </div>
+              )}
               <button
                 onClick={toggleWebSpeech}
                 disabled={isGeminiRecording || isProcessing}
@@ -681,10 +701,12 @@ export default function VoiceComposer({
                     ? "text-left font-sans text-base leading-relaxed"
                     : "text-right font-nastaleeq text-lg leading-loose"
                 }`}
-                placeholder={
+                 placeholder={
                   language === "ur"
                     ? "مسودہ یہاں ظاہر ہوگا۔ آپ بول کر یا براہِ راست کی بورڈ سے ٹائپ کر کے اضافہ کر سکتے ہیں..."
-                    : language === "ar"
+                  : language === "ur_ar"
+                    ? "مکس اردو اور عربی مسودہ یہاں ظاہر ہوگا۔ آپ بول کر یا براہِ راست کی بورڈ سے ٹائپ کر کے اضافہ کر سکتے ہیں..."
+                  : language === "ar"
                     ? "سيتم استخراج النص العربي هنا تلقائياً، يمكنك التعديل المباشر..."
                     : "Spoken or transcribed English text will appear here. Edit directly..."
                 }

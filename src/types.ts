@@ -19,7 +19,7 @@ export interface ComposerDraft {
   lastModifiedAt: string;
 }
 
-export type NativeLanguage = "ur" | "ar" | "en";
+export type NativeLanguage = "ur" | "ar" | "en" | "ur_ar";
 
 export interface OcrPageProgress {
   pageNumber: number;

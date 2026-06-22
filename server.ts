@@ -452,7 +452,7 @@ app.post("/api/refine-text", async (req, res) => {
  */
 app.post("/api/transcribe-audio", async (req, res) => {
   try {
-    const { audio, mimeType } = req.body;
+    const { audio, mimeType, language } = req.body;
     if (!audio) {
       return res.status(400).json({ error: "ریکارڈنگ آڈیو حاصل نہیں ہوئی۔" });
     }
@@ -480,14 +480,49 @@ app.post("/api/transcribe-audio", async (req, res) => {
       }
     }
 
-    const prompt = 
-      "You are a professional audio transcriber. Transcribe this audio recording with maximum precision.\n" +
-      "The audio is likely spoken in Urdu (اردو), Arabic (عربی), or English, or a fluid blend of these.\n" +
-      "Your instructions:\n" +
-      "1. Listen carefully and output the transcription in the correct native scripts. Urdu speech -> Urdu script, Arabic -> Arabic script with exact words, English -> standard Latin script.\n" +
-      "2. If the audio is completely silent, contains only static/rustle/background noise, or has no decipherable speech, respond with absolutely nothing (completely empty). Do NOT explain, and do NOT request files.\n" +
-      "3. Correct speech slip-ups, heavy breathing, hesitation filler words (like 'um', 'uh', 'اہ', 'وں') silences, or repetitive words silently.\n" +
-      "4. Only output the actual spoken words, typeset nicely. Do NOT write any introduction, commentary or meta labels.";
+    let prompt = "";
+    if (language === "ur_ar") {
+      prompt = 
+        "You are a professional audio transcriber specializing in a dual-language fluid mixture of Urdu and Arabic.\n" +
+        "The audio contains speech in Urdu language or Arabic language, or a fluid blend of both Urdu and Arabic.\n" +
+        "Your instructions:\n" +
+        "1. Listen carefully and output the transcription in the correct native scripts.\n" +
+        "2. Spoken Urdu MUST be transcribed precisely using standard Urdu script, which will render beautifully in Urdu Nastaliq style.\n" +
+        "3. Spoken Arabic (including Quranic verses, Prophetic sayings, Islamic formulas like 'السلام علیکم', 'ما شاء اللہ', 'جزاك الله خيرا', or standard Arabic citations/phrase fragments) MUST be transcribed precisely using proper Arabic orthography (Arabic Naskh script format).\n" +
+        "4. CRITICAL SPELLING RULE FOR ARABIC TA MARBUTA (ة): All Arabic words containing or ending with the letter Ta Marbuta (Teh Marbuta / 'ة' or 'ۃ') MUST be written with the dotted 'ة' or 'ۃ' (such as 'كلمة', 'آية', 'رحمة', 'سورة', 'صلوة', 'صلاة', 'زكاة', 'فاطمة', 'جماعة') and NEVER with a simple 'ہ' or 'ه' (Heh) (do NOT write 'کلمہ', 'آیہ', 'رحمہ', 'سورہ', 'صلاہ', 'صلوہ'). Ensure you preserve the two dots of the Ta Marbuta ('ة' / 'ۃ') in every Arabic word that grammatically ends with it.\n" +
+        "5. DO NOT translate Urdu to Arabic or Arabic to Urdu. Keep the original mixed speech exactly as spoken by the user.\n" +
+        "6. If there is also English spoken, transcribe it in standard Latin English.\n" +
+        "7. If the audio is completely silent or has no decipherable speech, respond with absolutely nothing (empty). Do NOT explain or write commentary.\n" +
+        "8. Correct speech slip-ups, heavy breathing, hesitation filler words (like 'um', 'uh', 'اہ', 'وں') silences, or repetitive words silently.\n" +
+        "9. Only output the actual spoken words, typeset nicely. Do NOT write any introduction or meta labels.";
+    } else if (language === "ar") {
+      prompt = 
+        "You are a professional Arabic audio transcriber. Transcribe this audio recording strictly into clear standard Arabic text with correct spelling and diacritics where appropriate.\n" +
+        "CRITICAL SPELLING RULE FOR TA MARBUTA (ة): All Arabic words ending with the letter Ta Marbuta (Teh Marbuta) MUST be written with the dotted 'ة' or 'ۃ' (such as 'كلمة', 'آية', 'رحمة', 'سورة', 'صلاة', 'زكاة', 'فاطمة', 'جماعة') and NEVER with a simple 'ہ' or 'ه' (Heh) (do NOT write 'کلمہ', 'آیہ', 'رحمہ', 'سورہ', 'صلاہ'). Always preserve the two dots on the last letter 'ة' / 'ۃ' of words that require it.\n" +
+        "If the audio is completely silent, contains only static, or has no decipherable speech, respond with absolutely nothing (completely empty). Do NOT explain.\n" +
+        "Correct speech slip-ups silently. Only output the actual spoken words.";
+    } else if (language === "ur") {
+      prompt = 
+        "You are a professional Urdu audio transcriber. Transcribe this audio recording strictly into standard Urdu text (Urdu script) with maximum spelling precision.\n" +
+        "If you encounter Arabic verses, formulas, or loanwords inside Urdu, pay close attention to use of Teh Marbuta ('ة' or 'ۃ') for words that require it in their classical/religious context (e.g. 'صلوۃ', 'زکوۃ', 'کلمۃ') instead of 'صلوہ' or 'کلمہ' if the user requested religious precision.\n" +
+        "If the audio is completely silent, contains only static, or has no decipherable speech, respond with absolutely nothing (completely empty). Do NOT explain.\n" +
+        "Correct speech slip-ups silently. Only output the actual spoken words.";
+    } else if (language === "en") {
+      prompt = 
+        "You are a professional English audio transcriber. Transcribe this audio recording strictly into standard English text (Latin script).\n" +
+        "If the audio is completely silent, contains only static, or has no decipherable speech, respond with absolutely nothing (completely empty). Do NOT explain.\n" +
+        "Correct speech slip-ups silently. Only output the actual spoken words.";
+    } else {
+      prompt = 
+        "You are a professional audio transcriber. Transcribe this audio recording with maximum precision.\n" +
+        "The audio is likely spoken in Urdu (اردو), Arabic (عربی), or English, or a fluid blend of these.\n" +
+        "Your instructions:\n" +
+        "1. Listen carefully and output the transcription in the correct native scripts. Urdu speech -> Urdu script, Arabic -> Arabic script with exact words, English -> standard Latin script.\n" +
+        "2. CRITICAL SPELLING RULE FOR TA MARBUTA (ة / ۃ): All Arabic words ending with the letter Ta Marbuta (Teh Marbuta) MUST be written with the dotted 'ة' or 'ۃ' (e.g. 'كلمة', 'آية', 'رحمة', 'سورة') and NEVER with 'ہ' or 'ه' (Heh) (do NOT write 'کلمہ', 'آیہ', 'رحمہ', 'سورہ').\n" +
+        "3. If the audio is completely silent, contains only static/rustle/background noise, or has no decipherable speech, respond with absolutely nothing (completely empty). Do NOT explain, and do NOT request files.\n" +
+        "4. Correct speech slip-ups, heavy breathing, hesitation filler words (like 'um', 'uh', 'اہ', 'وں') silences, or repetitive words silently.\n" +
+        "5. Only output the actual spoken words, typeset nicely. Do NOT write any introduction, commentary or meta labels.";
+    }
 
     const audioPart = {
       inlineData: {
