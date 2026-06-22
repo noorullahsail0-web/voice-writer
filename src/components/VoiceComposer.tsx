@@ -52,6 +52,7 @@ export default function VoiceComposer({
 
   const recognitionRef = useRef<any>(null);
   const contentRef = useRef(activeDraft.content);
+  const processedIndicesRef = useRef<Set<number>>(new Set());
 
   // Keep contentRef updated with the active draft's content synchronously
   useEffect(() => {
@@ -91,6 +92,7 @@ export default function VoiceComposer({
       rec.onstart = () => {
         setIsWebSpeechListening(true);
         setErrorMessage("");
+        processedIndicesRef.current.clear();
       };
 
       rec.onerror = (event: any) => {
@@ -123,7 +125,10 @@ export default function VoiceComposer({
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            finalText += event.results[i][0].transcript;
+            if (!processedIndicesRef.current.has(i)) {
+              processedIndicesRef.current.add(i);
+              finalText += event.results[i][0].transcript;
+            }
           } else {
             interim += event.results[i][0].transcript;
           }
