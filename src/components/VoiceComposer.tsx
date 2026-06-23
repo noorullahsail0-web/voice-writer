@@ -53,6 +53,7 @@ export default function VoiceComposer({
   const recognitionRef = useRef<any>(null);
   const contentRef = useRef(activeDraft.content);
   const processedIndicesRef = useRef<Set<number>>(new Set());
+  const startContentRef = useRef("");
 
   // Keep contentRef updated with the active draft's content synchronously
   useEffect(() => {
@@ -93,6 +94,7 @@ export default function VoiceComposer({
         setIsWebSpeechListening(true);
         setErrorMessage("");
         processedIndicesRef.current.clear();
+        startContentRef.current = contentRef.current;
       };
 
       rec.onerror = (event: any) => {
@@ -121,25 +123,26 @@ export default function VoiceComposer({
 
       rec.onresult = (event: any) => {
         let interim = "";
-        let finalText = "";
+        let finalSessionText = "";
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            if (!processedIndicesRef.current.has(i)) {
-              processedIndicesRef.current.add(i);
-              finalText += event.results[i][0].transcript;
+        // Rebuild full final transcription for this specific listening session from scratch.
+        // This is 100% immune to out-of-order event indices or rewritten event results on mobile devices.
+        for (let i = 0; i < event.results.length; ++i) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            const transcript = result[0].transcript;
+            if (transcript) {
+              finalSessionText += (finalSessionText && !finalSessionText.endsWith(" ") ? " " : "") + transcript;
             }
           } else {
-            interim += event.results[i][0].transcript;
+            interim += result[0].transcript;
           }
         }
 
-        if (finalText) {
-          // Append final result with a space using the up-to-date ref value to prevent component re-initializations
-          const currentContent = contentRef.current;
-          const separator = currentContent && !currentContent.endsWith(" ") ? " " : "";
-          onUpdateDraftContent(currentContent + separator + finalText);
-        }
+        // Set the state relative to the starting content snapshot of the session.
+        const baseContent = startContentRef.current;
+        const separator = baseContent && finalSessionText && !baseContent.endsWith(" ") ? " " : "";
+        onUpdateDraftContent(baseContent + separator + finalSessionText);
 
         setInterimTranscript(interim);
       };
