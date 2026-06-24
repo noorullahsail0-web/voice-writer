@@ -83,9 +83,12 @@ export default function App() {
   };
 
   const handleUpdateDraftContent = (content: string) => {
+    // Automatically convert Arabic Teh Marbuta (ة - \u0629) to Urdu Teh Marbuta (ۃ - \u06C3)
+    // for seamless, beautiful, and native rendering in Noto Nastaliq Urdu typography.
+    const normalizedContent = content ? content.replace(/\u0629/g, "\u06C3") : content;
     const updated = drafts.map((d) =>
       d.id === activeDraft.id
-        ? { ...d, content, lastModifiedAt: new Date().toISOString() }
+        ? { ...d, content: normalizedContent, lastModifiedAt: new Date().toISOString() }
         : d
     );
     saveDraftsToStorage(updated);
