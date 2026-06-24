@@ -51,6 +51,17 @@ const configurePdfWorker = () => {
       const blob = new Blob([workerSourceText], { type: "text/javascript" });
       const blobUrl = URL.createObjectURL(blob);
       const worker = new Worker(blobUrl, { type: "module" });
+      
+      // Ensure asynchronous worker-internal or security errors don't trigger global window "Script error."
+      worker.onerror = (e) => {
+        console.warn("[PDF Worker] Pre-configured Blob Module Web Worker raised internal or security exception. Caught and prevented default:", e);
+        try {
+          e.preventDefault();
+        } catch (evtErr) {
+          // Ignore preventDefault failures
+        }
+      };
+
       pdfjsLib.GlobalWorkerOptions.workerPort = worker;
       console.log("[PDF Worker] Pre-configured GlobalWorkerOptions with Native Blob Module Worker successfully!");
     }
@@ -61,6 +72,17 @@ const configurePdfWorker = () => {
         const blob = new Blob([workerSourceText], { type: "text/javascript" });
         const blobUrl = URL.createObjectURL(blob);
         const worker = new Worker(blobUrl);
+        
+        // Ensure asynchronous worker-internal or security errors don't trigger global window "Script error."
+        worker.onerror = (e) => {
+          console.warn("[PDF Worker] Pre-configured Blob Classic Web Worker raised internal or security exception. Caught and prevented default:", e);
+          try {
+            e.preventDefault();
+          } catch (evtErr) {
+            // Ignore preventDefault failures
+          }
+        };
+
         pdfjsLib.GlobalWorkerOptions.workerPort = worker;
         console.log("[PDF Worker] Pre-configured GlobalWorkerOptions with Native Blob Classic Worker successfully!");
       }
@@ -70,10 +92,7 @@ const configurePdfWorker = () => {
   }
 };
 
-// Eagerly pre-trigger the worker configuration
-if (typeof window !== "undefined") {
-  configurePdfWorker();
-}
+// Worker configuration is lazy-triggered inside getPdfjsLib upon active PDF uploads only
 
 const getPdfjsLib = () => {
   if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
@@ -615,7 +634,21 @@ export default function PdfExtractor({
   const shareToWhatsApp = () => {
     if (!activeDraft.content) return;
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(activeDraft.content)}`;
-    window.open(url, "_blank");
+    try {
+      const win = window.open(url, "_blank");
+      if (!win) {
+        throw new Error("Popup blocked");
+      }
+    } catch (e) {
+      console.warn("Direct window.open failed or blocked, falling back to anchor link simulation", e);
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
   };
 
   // Email

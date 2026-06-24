@@ -83,78 +83,86 @@ export default function VoiceComposer({
 
   // Initialize Web Speech API
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const rec = new SpeechRecognition();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = getLocaleForLanguage(language);
+    try {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const rec = new SpeechRecognition();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = getLocaleForLanguage(language);
 
-      rec.onstart = () => {
-        setIsWebSpeechListening(true);
-        setErrorMessage("");
-        processedIndicesRef.current.clear();
-        startContentRef.current = contentRef.current;
-      };
+        rec.onstart = () => {
+          setIsWebSpeechListening(true);
+          setErrorMessage("");
+          processedIndicesRef.current.clear();
+          startContentRef.current = contentRef.current;
+        };
 
-      rec.onerror = (event: any) => {
-        // Log as low severity warning to keep the console clean and prevent automated validation frameworks from flagging permission-blocked environments
-        console.warn("[Voice API Status]", event.error);
-        if (event.error === "not-allowed") {
-          setErrorMessage("مائیکروفون (آواز) کے استعمال کی اجازت مسترد یا بلاک کر دی گئی ہے۔ (پرمیشن بلاک: not-allowed)");
-        } else if (event.error === "no-speech") {
-          setErrorMessage("براہِ کرم کچھ بولیں! مائیکروفون پر کوئی آواز سنائی نہیں دی (صدا غائب: no-speech).");
-        } else if (event.error === "audio-capture") {
-          setErrorMessage("مائیکروفون یا آواز ریکارڈنگ ڈیوائس کا مسئلہ حل کریں (ڈیوائس خرابی: audio-capture).");
-        } else if (event.error === "network") {
-          setErrorMessage("براہِ راست آواز سروس کے لیے انٹرنیٹ کنکشن کا مسئلہ ہے (کنکشن تعطل: network).");
-        } else if (event.error === "aborted") {
-          console.log("Speech recognition was aborted.");
-        } else {
-          setErrorMessage(`آواز کی منتقلی میں رکاوٹ: ${event.error}`);
-        }
-        setIsWebSpeechListening(false);
-      };
-
-      rec.onend = () => {
-        setIsWebSpeechListening(false);
-        setInterimTranscript("");
-      };
-
-      rec.onresult = (event: any) => {
-        let interim = "";
-        let finalSessionText = "";
-
-        // Rebuild full final transcription for this specific listening session from scratch.
-        // This is 100% immune to out-of-order event indices or rewritten event results on mobile devices.
-        for (let i = 0; i < event.results.length; ++i) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            const transcript = result[0].transcript;
-            if (transcript) {
-              finalSessionText += (finalSessionText && !finalSessionText.endsWith(" ") ? " " : "") + transcript;
-            }
+        rec.onerror = (event: any) => {
+          // Log as low severity warning to keep the console clean and prevent automated validation frameworks from flagging permission-blocked environments
+          console.warn("[Voice API Status]", event.error);
+          if (event.error === "not-allowed") {
+            setErrorMessage("مائیکروفون (آواز) کے استعمال کی اجازت مسترد یا بلاک کر دی گئی ہے۔ (پرمیشن بلاک: not-allowed)");
+          } else if (event.error === "no-speech") {
+            setErrorMessage("براہِ کرم کچھ بولیں! مائیکروفون پر کوئی آواز سنائی نہیں دی (صدا غائب: no-speech).");
+          } else if (event.error === "audio-capture") {
+            setErrorMessage("مائیکروفون یا آواز ریکارڈنگ ڈیوائس کا مسئلہ حل کریں (ڈیوائس خرابی: audio-capture).");
+          } else if (event.error === "network") {
+            setErrorMessage("براہِ راست آواز سروس کے لیے انٹرنیٹ کنکشن کا مسئلہ ہے (کنکشن تعطل: network).");
+          } else if (event.error === "aborted") {
+            console.log("Speech recognition was aborted.");
           } else {
-            interim += result[0].transcript;
+            setErrorMessage(`آواز کی منتقلی میں رکاوٹ: ${event.error}`);
           }
-        }
+          setIsWebSpeechListening(false);
+        };
 
-        // Set the state relative to the starting content snapshot of the session.
-        const baseContent = startContentRef.current;
-        const separator = baseContent && finalSessionText && !baseContent.endsWith(" ") ? " " : "";
-        onUpdateDraftContent(baseContent + separator + finalSessionText);
+        rec.onend = () => {
+          setIsWebSpeechListening(false);
+          setInterimTranscript("");
+        };
 
-        setInterimTranscript(interim);
-      };
+        rec.onresult = (event: any) => {
+          let interim = "";
+          let finalSessionText = "";
 
-      recognitionRef.current = rec;
-    } else {
-      console.warn("SpeechRecognition not supported in this browser.");
+          // Rebuild full final transcription for this specific listening session from scratch.
+          // This is 100% immune to out-of-order event indices or rewritten event results on mobile devices.
+          for (let i = 0; i < event.results.length; ++i) {
+            const result = event.results[i];
+            if (result.isFinal) {
+              const transcript = result[0].transcript;
+              if (transcript) {
+                finalSessionText += (finalSessionText && !finalSessionText.endsWith(" ") ? " " : "") + transcript;
+              }
+            } else {
+              interim += result[0].transcript;
+            }
+          }
+
+          // Set the state relative to the starting content snapshot of the session.
+          const baseContent = startContentRef.current;
+          const separator = baseContent && finalSessionText && !baseContent.endsWith(" ") ? " " : "";
+          onUpdateDraftContent(baseContent + separator + finalSessionText);
+
+          setInterimTranscript(interim);
+        };
+
+        recognitionRef.current = rec;
+      } else {
+        console.warn("SpeechRecognition not supported in this browser.");
+      }
+    } catch (err) {
+      console.warn("SpeechRecognition initialization failed inside iframe/sandbox:", err);
     }
 
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.abort();
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {
+          // Ignore
+        }
       }
     };
   }, [language]);
@@ -428,7 +436,21 @@ export default function VoiceComposer({
   const shareToWhatsApp = () => {
     if (!activeDraft.content) return;
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(activeDraft.content)}`;
-    window.open(url, "_blank");
+    try {
+      const win = window.open(url, "_blank");
+      if (!win) {
+        throw new Error("Popup blocked");
+      }
+    } catch (e) {
+      console.warn("Direct window.open failed or blocked, falling back to anchor link simulation", e);
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
   };
 
   // Send via Email
